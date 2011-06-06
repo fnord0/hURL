@@ -1,0 +1,18 @@
+.::[ hURL - hexadecimal & URL encoder + decoder  v1.0 ]::.
+
+  USAGE: ./hURL [e|d|h|x] [string|-f <filename>]
+   ENCODED OUTPUT will always be on a single line ;)
+
+        COMMAND LINE ARGUMENTS
+        -e      => URL encode
+        -d      => URL decode
+        -h      => hex encode
+        -x      => hex decode
+        -f <filename>   => use a file as input, instead of a string on the command-line
+        --help          => displays help
+        --version       => displays version information
+
+                EXAMPLES:  ./hURL -e "hello world"
+                           ./hURL -h "hello world"
+                           ./hURL -x 68656c6c6f20776f726c64
+                           ./hURL -h -f /var/www/meterpreter.php
