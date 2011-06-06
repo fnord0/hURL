@@ -1,0 +1,115 @@
+#!/usr/bin/perl
+# hURL - hexadecimal & URL encoder + decoder  v1.0
+# copyleft - fnord0@riseup.net
+
+use strict;
+use vars qw/$myFile $myStringHex $fh @hexyLines @opt %opt %opts $string $urlenc $hex $opt $zeFile/;
+$|++;
+use CGI;
+use URI::Escape;
+use Getopt::Std;
+use Term::ANSIColor qw(:constants);
+$Getopt::Std::STANDARD_HELP_VERSION = 1;
+$opt = 'edhxf:';
+getopts( $opt, \%opt );
+
+if ( ! $ARGV[0] ) {
+	main::VERSION_MESSAGE STDERR;
+	main::HELP_MESSAGE STDERR;
+	exit;
+}
+
+if ($opt{f}) {
+	$myFile = $opt{f};
+	open(INPUTFILE, "$myFile");
+	undef $/;
+	while (<INPUTFILE>) {
+		chomp;
+		$string = $_;
+	}
+	close(INPUTFILE);
+}
+
+e() if $opt{e};
+d() if $opt{d};
+h() if $opt{h};
+x() if $opt{x};
+sub e {
+	if ($ARGV[0]) {
+		$string = $ARGV[0];
+		print BOLD, BLUE, "\nOriginal string: " . RESET, BOLD, "$string\n", RESET;
+		print BOLD, CYAN, "URL ENcoded string: " . RESET, BOLD, CGI::escape("$string") . "\n". RESET;
+	} else {
+		print BOLD, BLUE, "\nOriginal file: " . RESET, BOLD, "$opt{f}\n", RESET;
+		print BOLD, CYAN, "URL ENcoded file: " . RESET, BOLD, CGI::escape("$string") . "\n". RESET;
+	}
+}
+
+sub d {
+	if ($ARGV[0]) {
+		$string = $ARGV[0];
+		$string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+		print BOLD, BLUE, "\nOriginal string: " . RESET, BOLD, "$ARGV[0]\n", RESET;
+		print BOLD, CYAN, "URL DEcoded string: " . RESET, BOLD, "$string\n", RESET;
+	} else {
+		$string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+		print BOLD, BLUE, "\nOriginal file: " . RESET, BOLD, "$opt{f}\n", RESET;
+		print BOLD, CYAN, "URL DEcoded file: " . RESET, BOLD, "$string\n", RESET;
+	}
+}
+
+sub h {
+	if ($ARGV[0]) {
+		$string = $ARGV[0];
+		$myStringHex = unpack("H*", $string);
+		print BOLD, BLUE, "\nOriginal string: " . RESET, BOLD, "$string\n", RESET;
+		print BOLD, CYAN, "Hex ENcoded string: " . RESET, BOLD, "$myStringHex\n", RESET;
+	} else {
+		$myStringHex = unpack("H*", $string);
+		print BOLD, BLUE, "\nOriginal file: " . RESET, BOLD, "$opt{f}\n", RESET;
+		print BOLD, CYAN, "Hex ENcoded file: " . RESET, BOLD, "$myStringHex\n", RESET;
+	}
+}
+
+sub x {
+	if ($ARGV[0]) {
+		$string = $ARGV[0];
+		print BOLD, BLUE, "\nOriginal HEX string: " . RESET, BOLD, "$string\n", RESET;
+		print BOLD, CYAN, "ASCII DEcoded string: " . RESET;
+		while($string =~ /(.{2})/sg) {
+			print BOLD, chr(hex($1)), RESET;
+		}
+		print "\n";
+	} else {
+		print BOLD, BLUE, "\nOriginal file: " . RESET, BOLD, "$opt{f}\n", RESET;
+		print BOLD, CYAN, "ASCII DEcoded file: " . RESET;
+		while($string =~ /(.{2})/sg) {
+			print BOLD, chr(hex($1)), RESET;
+		}
+		print "\n";
+	}
+}
+
+sub main::VERSION_MESSAGE { $fh = shift;
+	print $fh ".::[" . RESET, BOLD, " hURL - hexadecimal & URL encoder + decoder  v1.0 " . RESET, "]::.\n";
+}
+
+sub main::HELP_MESSAGE { $fh = shift; 
+	print $fh BOLD, RED, "\n  USAGE: ", RESET;
+	print $fh BOLD, BLUE, "$0 " . BOLD, BLUE, "[" . BOLD, CYAN, "e" . BOLD, BLUE, "|" . BOLD, CYAN, "d" . BOLD, BLUE, "|" . BOLD, CYAN, "h" . BOLD, BLUE, "|" . BOLD, CYAN, "x" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "string" . BOLD, BLUE, "|" . BOLD, CYAN, "-f <filename>" . BOLD, BLUE, "]\n", RESET;
+	print $fh BOLD, "   ENCODED OUTPUT will " . RESET, BOLD, RED, "always" . RESET, BOLD, " be on a single line ;)\n\n", RESET;
+	print $fh "\tCOMMAND LINE ARGUMENTS\n", RESET;
+	print $fh BOLD, BLUE, "\t-e " . RESET, BOLD, BLUE, "\t" . RESET "=> URL " . BOLD, "e" . RESET, "ncode\n", RESET;
+	print $fh BOLD, BLUE, "\t-d " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> URL " . BOLD, "d" . RESET, "ecode\n", RESET;
+	print $fh BOLD, BLUE, "\t-h " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "h" . RESET, "ex encode\n", RESET;
+	print $fh BOLD, BLUE, "\t-x " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> he" . BOLD, "x" . RESET, " decode\n", RESET;
+	print $fh BOLD, BLUE, "\t-f <" . RESET, BOLD, "filename" . BOLD, BLUE, ">\t" . RESET "=> use a file as input, instead of a string on the command-line\n", RESET;
+	print $fh BOLD, BLUE, "\t--help\t\t" . RESET, "=> displays help\n";
+	print $fh BOLD, BLUE, "\t--version\t" . RESET, "=> displays version information\n";
+	print $fh "\n";
+	print $fh "\t\tEXAMPLES:  " . BOLD, BLUE, "$0 -e \"hello world\"\n", RESET;
+	print $fh "\t\t           " . BOLD, BLUE, "$0 -h \"hello world\"\n", RESET;
+	print $fh "\t\t           " . BOLD, BLUE, "$0 -x 68656c6c6f20776f726c64\n", RESET;
+	print $fh "\t\t           " . BOLD, BLUE, "$0 -h -f /var/www/meterpreter.php\n", RESET;
+	print $fh "\n";
+}
