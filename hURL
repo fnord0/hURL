@@ -13,7 +13,7 @@ $Getopt::Std::STANDARD_HELP_VERSION = 1;
 $opt = 'edhxf:';
 getopts( $opt, \%opt );
 
-if ( ! $ARGV[0] ) {
+if ( ! $ARGV[0] && ! $opt{f} ) {
 	main::VERSION_MESSAGE STDERR;
 	main::HELP_MESSAGE STDERR;
 	exit;
