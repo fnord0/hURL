@@ -1,16 +1,18 @@
 #!/usr/bin/perl
-# hURL - hexadecimal & URL encoder + decoder  v1.0
+# hURL - hexadecimal & URL encoder + decoder  v1.1
+# added md5 digest capability
 # copyleft - fnord0@riseup.net
 
 use strict;
-use vars qw/$myFile $myStringHex $fh @hexyLines @opt %opt %opts $string $urlenc $hex $opt $zeFile/;
+use vars qw/$myFile $myStringHex $myStringmd5 $fh @hexyLines @opt %opt %opts $string $urlenc $hex $opt $zeFile/;
 $|++;
 use CGI;
 use URI::Escape;
+use Digest::MD5 qw(md5_hex);
 use Getopt::Std;
 use Term::ANSIColor qw(:constants);
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$opt = 'edhxf:';
+$opt = 'edhxif:';
 getopts( $opt, \%opt );
 
 if ( ! $ARGV[0] && ! $opt{f} ) {
@@ -34,6 +36,7 @@ e() if $opt{e};
 d() if $opt{d};
 h() if $opt{h};
 x() if $opt{x};
+i() if $opt{i};
 sub e {
 	if ($ARGV[0]) {
 		$string = $ARGV[0];
@@ -90,19 +93,32 @@ sub x {
 	}
 }
 
+sub i {
+	if ($ARGV[0]) {
+		$string = $ARGV[0];
+		$myStringmd5 = md5_hex( $string );
+		print BOLD, BLUE, "\nOriginal string: " . RESET, BOLD, "$string\n", RESET;
+                print BOLD, CYAN, "MD5 digest of string: " . RESET, BOLD, "$myStringmd5\n", RESET;
+        } else {
+                $myStringmd5 = md5_hex($string);
+                print BOLD, BLUE, "\nOriginal file: " . RESET, BOLD, "$opt{f}\n", RESET;
+                print BOLD, CYAN, "MD5 digest of file: " . RESET, BOLD, "$myStringmd5\n", RESET;
+        }
+}
 sub main::VERSION_MESSAGE { $fh = shift;
-	print $fh ".::[" . RESET, BOLD, " hURL - hexadecimal & URL encoder + decoder  v1.0 " . RESET, "]::.\n";
+	print $fh ".::[" . RESET, BOLD, " hURL - hexadecimal & URL encoder + decoder  v1.1 " . RESET, "]::.\n";
 }
 
 sub main::HELP_MESSAGE { $fh = shift; 
 	print $fh BOLD, RED, "\n  USAGE: ", RESET;
-	print $fh BOLD, BLUE, "$0 " . BOLD, BLUE, "[" . BOLD, CYAN, "e" . BOLD, BLUE, "|" . BOLD, CYAN, "d" . BOLD, BLUE, "|" . BOLD, CYAN, "h" . BOLD, BLUE, "|" . BOLD, CYAN, "x" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "string" . BOLD, BLUE, "|" . BOLD, CYAN, "-f <filename>" . BOLD, BLUE, "]\n", RESET;
+	print $fh BOLD, BLUE, "$0 " . BOLD, BLUE, "[" . BOLD, CYAN, "e" . BOLD, BLUE, "|" . BOLD, CYAN, "d" . BOLD, BLUE, "|" . BOLD, CYAN, "h" . BOLD, BLUE, "|" . BOLD, CYAN, "x" . BOLD, BLUE, "|" . BOLD, CYAN, "i" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "string" . BOLD, BLUE, "|" . BOLD, CYAN, "-f <filename>" . BOLD, BLUE, "]\n", RESET;
 	print $fh BOLD, "   ENCODED OUTPUT will " . RESET, BOLD, RED, "always" . RESET, BOLD, " be on a single line ;)\n\n", RESET;
 	print $fh "\tCOMMAND LINE ARGUMENTS\n", RESET;
 	print $fh BOLD, BLUE, "\t-e " . RESET, BOLD, BLUE, "\t" . RESET "=> URL " . BOLD, "e" . RESET, "ncode\n", RESET;
 	print $fh BOLD, BLUE, "\t-d " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> URL " . BOLD, "d" . RESET, "ecode\n", RESET;
 	print $fh BOLD, BLUE, "\t-h " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "h" . RESET, "ex encode\n", RESET;
 	print $fh BOLD, BLUE, "\t-x " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> he" . BOLD, "x" . RESET, " decode\n", RESET;
+	print $fh BOLD, BLUE, "\t-i " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> md5 d" . BOLD, "i" . RESET, "gest\n", RESET;
 	print $fh BOLD, BLUE, "\t-f <" . RESET, BOLD, "filename" . BOLD, BLUE, ">\t" . RESET "=> use a file as input, instead of a string on the command-line\n", RESET;
 	print $fh BOLD, BLUE, "\t--help\t\t" . RESET, "=> displays help\n";
 	print $fh BOLD, BLUE, "\t--version\t" . RESET, "=> displays version information\n";

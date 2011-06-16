@@ -1,6 +1,6 @@
-.::[ hURL - hexadecimal & URL encoder + decoder  v1.0 ]::.
+.::[ hURL - hexadecimal & URL encoder + decoder  v1.1 ]::.
 
-  USAGE: ./hURL [e|d|h|x] [string|-f <filename>]
+  USAGE: ./hURL [e|d|h|x|i] [string|-f <filename>]
    ENCODED OUTPUT will always be on a single line ;)
 
         COMMAND LINE ARGUMENTS
@@ -8,11 +8,12 @@
         -d      => URL decode
         -h      => hex encode
         -x      => hex decode
+        -i      => md5 digest
         -f <filename>   => use a file as input, instead of a string on the command-line
         --help          => displays help
         --version       => displays version information
 
                 EXAMPLES:  ./hURL -e "hello world"
-                           ./hURL -h "hello world"
+                           ./hURL -h "hello world" 
                            ./hURL -x 68656c6c6f20776f726c64
                            ./hURL -h -f /var/www/meterpreter.php
