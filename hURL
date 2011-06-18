@@ -240,7 +240,7 @@ sub main::VERSION_MESSAGE { $fh = shift;
 
 sub main::HELP_MESSAGE { $fh = shift; 
 	print $fh BOLD, RED, "\n  USAGE: ", RESET;
-	print $fh BOLD, BLUE, "$0 " . BOLD, BLUE, "[" . BOLD, CYAN, "e" . BOLD, BLUE, "|" . BOLD, CYAN, "d" . BOLD, BLUE, "|" . BOLD, CYAN, "h" . BOLD, BLUE, "|" . BOLD, CYAN, "x" . BOLD, BLUE, "|" . BOLD, CYAN, "m" . BOLD, BLUE, "|" . BOLD, CYAN, "b" . BOLD, BLUE, "|" . BOLD, CYAN, "a" . BOLD, BLUE, "|" . BOLD, CYAN, "t" . BOLD, BLUE, "|" . BOLD, CYAN, "l" . BOLD, BLUE, "|" . BOLD, CYAN, "s" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "string" . BOLD, BLUE, "|" . BOLD, CYAN, "-f <filename>" . BOLD, BLUE, "]\n", RESET;
+	print $fh BOLD, BLUE, "$0 " . BOLD, BLUE, "[" . BOLD, CYAN, "e" . BOLD, BLUE, "|" . BOLD, CYAN, "d" . BOLD, BLUE, "|" . BOLD, CYAN, "h" . BOLD, BLUE, "|" . BOLD, CYAN, "x" . BOLD, BLUE, "|" . BOLD, CYAN, "m" . BOLD, BLUE, "|" . BOLD, CYAN, "b" . BOLD, BLUE, "|" . BOLD, CYAN, "a" . BOLD, BLUE, "|" . BOLD, CYAN, "t" . BOLD, BLUE, "|" . BOLD, CYAN, "l" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "-s" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "string" . BOLD, BLUE, "|" . BOLD, CYAN, "-f <filename>" . BOLD, BLUE, "]\n", RESET;
 	print $fh "\n";
 	print $fh "\tCOMMAND LINE ARGUMENTS\n", RESET;
 	print $fh BOLD, BLUE, "\t-e " . RESET, BOLD, BLUE, "\t" . RESET "=> URL " . BOLD, "e" . RESET, "ncode\n", RESET;
