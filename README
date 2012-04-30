@@ -1,24 +1,40 @@
-.::[ hURL - hexadecimal & URL encoder + decoder  v1.3 ]::.
-
-  USAGE: ./hURL [e|d|h|x|m|b|a|t|l] [-s] [string|-f <filename>]
+.::[ hURL - hexadecimal & URL (en/de)coder v2.0 ]::.
+  USAGE: ./hURL [U|u|B|b|H|h|X|x|I|i|n|N|T|t|F|l|o|O|0|1|2|3|4|5|6|m|e|E] [-s] [string|-f <filename>]
 
 	COMMAND LINE ARGUMENTS
-	-e 	=> URL encode
-	-d 	=> URL decode
-	-h 	=> hex encode
-	-x 	=> hex decode
-	-m 	=> md5 digest
-	-b 	=> base64 encode
-	-a 	=> base64 decode
-	-t 	=> html encode
-	-l 	=> html decode
-	-s 	=> suppress (display result only)
+	-U 	=> URL encode		;  ./hURL -U "hello world"
+	-u 	=> uRL decode		;  ./hURL -u "hello%20world"
+	-B 	=> Base64 encode	;  ./hURL -B "hello world"
+	-b 	=> base64 decode	;  ./hURL -b "aGVsbG8gd29ybGQ="
+	-H 	=> HTML encode		;  ./hURL -H "<hello world>"
+	-h 	=> hTML decode		;  ./hURL -h "&lt;hello world&gt;"
+	-X 	=> ascii ->  heX	;  ./hURL -X "hello world"
+	-x 	=> hex   ->  ascii	;  ./hURL -x "68656c6c6f20776f726c64"
+	-I 	=> Int   ->  hex	;  ./hURL -I "10"
+	-i 	=> hex   ->  int	;  ./hURL -i "0xa"
+	-n 	=> -int  ->  hex	;  ./hURL -n -- -77
+	-N 	=> -hex  ->  iNt	;  ./hURL -N 0xffffffb3
+	-T 	=> inT   ->  bin	;  ./hURL -T 30
+	-t 	=> bin   ->  int	;  ./hURL -t 1010
+	-F 	=> Float ->  hex	;  ./hURL -F 3.33
+	-l 	=> hex   ->  flloat	;  ./hURL -l 0x40551ed8
+	-o 	=> octal ->  hex	;  ./hURL -o 35
+	-O 	=> hex   ->  Octal	;  ./hURL -O 0x12
+	-0 	=> bin   ->  hex	;  ./hURL -0 1100011
+	-1 	=> hex   ->  bin	;  ./hURL -1 0x63
+	-2 	=> SHA1 checksum	;  ./hURL -2 "hello world"
+	-3 	=> SHA224 checksum	;  ./hURL -3 "hello world"
+	-4 	=> SHA256 checksum	;  ./hURL -4 "hello world"
+	-5 	=> SHA384 checksum	;  ./hURL -5 "hello world"
+	-6 	=> SHA512 checksum	;  ./hURL -6 "hello world"
+	-m 	=> md5 digest		;  ./hURL -m "hello world"
+	-e 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
+	-E 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
+
+	-s 		=> suppress (display result only)
 	-f <filename>	=> use a file as input, instead of a string on the command-line
 	--help		=> displays help
 	--version	=> displays version information
 
-		EXAMPLES:  ./hURL -e "hello world"
-		           ./hURL -h "hello world"
-		           ./hURL -x 68656c6c6f20776f726c64
-		           ./hURL -a -s "aGVsbG8gd29ybGQ="
-		           ./hURL -h -f /var/www/meterpreter.php
+		EXAMPLES:  ./hURL -b -s "aGVsbG8gd29ybGQ="
+		           ./hURL -X -f /var/www/meterpreter.php
