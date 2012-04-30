@@ -17,7 +17,7 @@
 	-T 	=> inT   ->  bin	;  ./hURL -T 30
 	-t 	=> bin   ->  int	;  ./hURL -t 1010
 	-F 	=> Float ->  hex	;  ./hURL -F 3.33
-	-l 	=> hex   ->  flloat	;  ./hURL -l 0x40551ed8
+	-l 	=> hex   ->  float	;  ./hURL -l 0x40551ed8
 	-o 	=> octal ->  hex	;  ./hURL -o 35
 	-O 	=> hex   ->  Octal	;  ./hURL -O 0x12
 	-0 	=> bin   ->  hex	;  ./hURL -0 1100011
