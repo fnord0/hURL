@@ -497,7 +497,7 @@ sub sha1 {
         } elsif ($ARGV[0]) {
                 $sha = $ARGV[0];
  		$sha1 = Digest::SHA::sha1_hex("$sha");
-                print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
+                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
                 print BOLD, CYAN, "SHA1 checksum   :: " . RESET, BOLD, "$sha1" . "\n", RESET;
         } else {
                 print BOLD, BLUE, "\nOriginal file         :: " . RESET, BOLD, "$opt{f}\n", RESET;
@@ -521,7 +521,7 @@ sub sha224 {
         } elsif ($ARGV[0]) {
                 $sha24 = $ARGV[0];
  		$sha224 = Digest::SHA::sha224_hex("$sha24");
-                print BOLD, BLUE, "\nOriginal file  :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
+                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
                 print BOLD, CYAN, "SHA224 checksum  :: " . RESET, BOLD, "$sha224" . "\n", RESET;
         } else {
                 print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
@@ -546,7 +546,7 @@ sub sha256 {
         } elsif ($ARGV[0]) {
                 $sha2 = $ARGV[0];
  		$sha256 = Digest::SHA::sha256_hex("$sha2");
-                print BOLD, BLUE, "\nOriginal file  :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
+                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
                 print BOLD, CYAN, "SHA256 checksum  :: " . RESET, BOLD, "$sha256" . "\n", RESET;
         } else {
                 print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
@@ -570,7 +570,7 @@ sub sha384 {
         } elsif ($ARGV[0]) {
                 $sha3 = $ARGV[0];
  		$sha384 = Digest::SHA::sha384_hex("$sha3");
-                print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
+                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
                 print BOLD, CYAN, "SHA384 checksum :: " . RESET, BOLD, "$sha384" . "\n", RESET;
         } else {
                 print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
@@ -594,7 +594,7 @@ sub sha512 {
         } elsif ($ARGV[0]) {
                 $sha5 = $ARGV[0];
  		$sha512 = Digest::SHA::sha512_hex("$sha5");
-                print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
+                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
                 print BOLD, CYAN, "SHA512 checksum :: " . RESET, BOLD, "$sha512" . "\n", RESET;
         } else {
                 print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
