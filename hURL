@@ -5,356 +5,590 @@
 # 06162011 => added HTML encode + decode
 # 06172011 => added "-s" supress (minimal mode). combine with other tools (i.e. msfvenom)
 # 04242012 => SHA1/224/256/384/512 + MORE, script becomes similar in vein to radare's rax(2) base conversion tool
+# 05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: pvePushString.pl)
+# 05202012 => Getopt::Long for better command-line support
+# 05202012 => --man option for extended documentation done using Pod::Usage
+# 05202012 => color|nocolor optional support added
+# 05212012 => multi-file support  +  bundling of multi-file && string on cmdline
 #######################################################
 # copyleft - fnord0@riseup.net
 
 use strict;
-use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line/;
+#use warnings;
+use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord/;
 $|++;
+use Getopt::Long qw(:config bundling no_ignore_case);
+use Pod::Usage;
+#use Pod::Text;
+use Pod::Text::Color;
 use CGI;
 use URI::Escape;
 use Digest::MD5 qw(md5_hex);
 use MIME::Base64 ();
 use HTML::Entities;
 use Digest::SHA;
-use Getopt::Std;
-use Term::ANSIColor qw(:constants);
-$Getopt::Std::STANDARD_HELP_VERSION = 1;
-$opt = 'UuBbHhXxmIiTtFOoeEnNl0123456sf:';
-getopts( $opt, \%opt );
 
-if ( ! $ARGV[0] && ! $opt{f} ) {
-	main::VERSION_MESSAGE STDERR;
-	main::HELP_MESSAGE STDERR;
-	exit;
+## test for color support
+eval { require Term::ANSIColor; };
+my $HAS_COLOR = $@ ? 0 : 1;
+
+my $VERSION = "v2.1";
+
+sub VERSION_MESSAGE {
+	#print BOLD(), RED(), "IrcMarkers $VERSION (C) 2003-2008 Christoph Berg <cb\@df7cb.de>, GNU GPL.\n", RESET();
+	print ".::[", RESET(), BOLD(), " hURL - hexadecimal & URL (en/de)coder ", RESET(), "]::.\n";
+	print RESET(), BOLD(), "$VERSION \@COPYLEFT  ->  fnord0 <at> riseup <dot> net\n", RESET();
 }
 
-if ($opt{f}) {
-	local $/;	# same as 'local undef $/;' enables "slurp mode" to read entire file
-	$myFile = $opt{f};
-	open(INPUTFILE, "$myFile") or die "$!";
-	while (<INPUTFILE>) {
-		chomp $_;
-		$line = $_;
-		last if $line eq "done";
-		$string = $_;
-		$string =~ s/\R*$//;	# removes last linebreak/newline
+sub HELP_MESSAGE {
+	VERSION_MESSAGE();
+	print BOLD(), RED(), "\n  USAGE: ", RESET();
+	print BOLD(), BLUE(), "$0 " . BOLD(), BLUE(), "[" . BOLD(), CYAN(), "U" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "u" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "B" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "b" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "H" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "h" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "X" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "x" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "I" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "i" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), BOLD(), CYAN(), "n" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "N" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "T" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "t" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "F" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "l" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "o" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "O" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "0" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "1" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "2" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "3" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "4" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "5" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "6" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "m" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "e" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "E" . BOLD(), BLUE(), "]" . BOLD(), BLUE(), " [" . BOLD(), CYAN(), "-s" . BOLD(), BLUE(), "]" . BOLD(), BLUE(), " [" . BOLD(), CYAN(), "string" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "-f <filename>" . BOLD(), BLUE(), "]\n", RESET();
+	print "\n";
+	print "\tCOMMAND LINE ARGUMENTS\n", RESET();
+	print BOLD(), BLUE(), "\t-U ", RESET(), BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "U", RESET(), "RL encode", RESET(), "\t\t;  $0 -U \"hello world\"\n";
+	print BOLD(), BLUE(), "\t-u ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "u", RESET(), "RL decode", RESET(), "\t\t;  $0 -u \"hello%20world\"\n";
+	print BOLD(), BLUE(), "\t-B ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "B", RESET(), "ase64 encode", RESET(), "\t;  $0 -B \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-b ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "b", RESET(), "ase64 decode", RESET(), "\t;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
+        print BOLD(), BLUE(), "\t-H ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "H", RESET(), "TML encode", RESET(), "\t\t;  $0 -H \"<hello world>\"\n";
+        print BOLD(), BLUE(), "\t-h ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "h", RESET(), "TML decode", RESET(), "\t\t;  $0 -h \"&lt;hello world&gt;\"\n";
+        print BOLD(), BLUE(), "\t-X ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> ascii ->  he" . BOLD(), "X", RESET(), "\t;  $0 -X \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-x ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> he" . BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t;  $0 -x \"68656c6c6f20776f72664\"\n";
+        print BOLD(), BLUE(), "\t-I ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "I", RESET(), "nt   ->  hex", RESET(), "\t;  $0 -I \"10\"\n";
+        print BOLD(), BLUE(), "\t-i ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  " . BOLD(), "i", RESET(), "nt", RESET(), "\t;  $0 -i \"0xa\"\n";
+        print BOLD(), BLUE(), "\t-n ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> -i" . BOLD(), "n", RESET(), "t  ->  hex", RESET(), "\t;  $0 -n -- -77\n";
+        print BOLD(), BLUE(), "\t-N ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> -hex  ->  i" . BOLD(), "N", RESET(), "t", RESET(), "\t;  $0 -N 0xffffffb3\n";
+        print BOLD(), BLUE(), "\t-T ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> in" . BOLD(), "T", RESET(), "   ->  bin", RESET(), "\t;  $0 -T 30\n";
+        print BOLD(), BLUE(), "\t-t ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> bin   ->  in" . BOLD(), "t", RESET(), "\t;  $0 -t 1010\n";
+        print BOLD(), BLUE(), "\t-F ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "F", RESET(), "loat ->  hex", RESET(), "\t;  $0 -F 3.33\n";
+        print BOLD(), BLUE(), "\t-l ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  f" . BOLD(), "l", RESET(), "oat", RESET(), "\t;  $0 -l 0x40551ed8\n";
+        print BOLD(), BLUE(), "\t-o ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "o", RESET(), "ctal ->  hex", RESET(), "\t;  $0 -o 35\n";
+        print BOLD(), BLUE(), "\t-O ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  " . BOLD(), "O", RESET(), "ctal", RESET(), "\t;  $0 -O 0x12\n";
+        print BOLD(), BLUE(), "\t-0 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> bin   -> " . BOLD(), "", RESET(), " hex", RESET(), "\t;  $0 -0 1100011\n";
+        print BOLD(), BLUE(), "\t-1 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   -> " . BOLD(), "", RESET(), " bin", RESET(), "\t;  $0 -1 0x63\n";
+        print BOLD(), BLUE(), "\t-2 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA1 checksum", RESET(), "\t;  $0 -2 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-3 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA224 checksum", RESET(), "\t;  $0 -3 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-4 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA256 checksum", RESET(), "\t;  $0 -4 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-5 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA384 checksum", RESET(), "\t;  $0 -5 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-6 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA512 checksum", RESET(), "\t;  $0 -6 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-m ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "m", RESET(), "d5 digest", RESET(), "\t\t;  $0 -m \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-e ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> int -> hex (n" . BOLD(), "e", RESET(), "twork-byte order)", RESET(), "\t;  $0 -e 4444\n";
+        print BOLD(), BLUE(), "\t-E ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex (n" . BOLD(), "E", RESET(), "twork-byte order) ->  int", RESET(), "\t;  $0 -E 5c11\n";
+        print "\n";
+        print BOLD(), BLUE(), "\t-s ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t\t", RESET(), "=> " . BOLD(), "s", RESET(), "uppress (display result ", RESET(), BOLD(), "only", RESET(), ")\n", RESET();
+        print BOLD(), BLUE(), "\t-f <", RESET(), BOLD(), "filename" . BOLD(), BLUE(), ">\t", RESET(), "=> use a file as input, instead of a string on the command-line\n", RESET();
+        print BOLD(), BLUE(), "\t--help\t\t", RESET(), "=> displays help\n";
+        print BOLD(), BLUE(), "\t--version\t", RESET(), "=> displays version information\n";
+        print "\n";
+        print "\t\tEXAMPLES:  " . BOLD(), BLUE(), "$0 -b -s \"aGVsbG8gd29ybGQ=\"\n", RESET();
+        print "\t\t           " . BOLD(), BLUE(), "$0 -X -f /var/www/meterpreter.php\n", RESET();
+	exit 0;
+}
+
+## default config values
+my %opts = (
+	    config => '',
+	    color => 1,
+	   );
+
+Getopt::Long::Configure("no_ignore_case");
+GetOptions(\%opts,
+   'URL|U'	=> \$opts{URL},
+   'url|u'	=> \$opts{url},
+   'BASE64|B'	=> \$opts{BASE64},
+   'base64|b'	=> \$opts{base64},
+   'HTML|H'	=> \$opts{HTML},
+   'html|h'	=> \$opts{html},
+   'HEX|X'	=> \$opts{HEX},
+   'hex|x'	=> \$opts{hex},
+   'md5|m'	=> \$opts{md5},
+   'INT|I'	=> \$opts{INT},
+   'int|i'	=> \$opts{int},
+   'nint|n'	=> \$opts{nint},
+   'NHEX|N'	=> \$opts{NHEX},
+   'INTB|T'	=> \$opts{INTB},
+   'bint|t'	=> \$opts{bint},
+   'FLOATH|F'	=> \$opts{FLOATH},
+   'hfloat|l'	=> \$opts{hfloat},
+   'octh|o'	=> \$opts{octh},
+   'HOCT|O'	=> \$opts{HOCT},
+   'binh|0'	=> \$opts{binh},
+   'hexb|1'	=> \$opts{hexb},
+   'SHA1|2'	=> \$opts{SHA1},
+   'SHA224|3'	=> \$opts{SHA224},
+   'SHA256|4'	=> \$opts{SHA256},
+   'SHA384|5'	=> \$opts{SHA384},
+   'SHA512|6'	=> \$opts{SHA512},
+   'stack|7'	=> \$opts{stack},
+   'net|e'	=> \$opts{net},
+   'NET|E'	=> \$opts{NET},
+   'suppress|s'	=> \$opts{suppress},
+   'file|f=s'	=> \@file,
+   'color!'	=> \$opts{color},
+   'help'	=> sub { HELP_MESSAGE(); },
+   'man' 	=> sub { pod2usage( { -verbose=>2 } ); exit; },
+   'version' 	=> sub { VERSION_MESSAGE(); exit(0); },
+);
+   #'man' 	=> sub { pod2usage( { -verbose=>2, -input => \*DATA } ); exit; },
+
+## user may want to disable color
+if ($HAS_COLOR and not $opts{color})
+{
+    $HAS_COLOR = 0;
+}
+
+if ($HAS_COLOR)
+{
+    import Term::ANSIColor ':constants';
+}
+else
+{
+    *RESET  = sub { };
+    *YELLOW = sub { };
+    *CYAN   = sub { };
+    *RED    = sub { };
+    *GREEN  = sub { };
+    *BLUE   = sub { };
+    *WHITE  = sub { };
+    *BOLD   = sub { };
+}
+
+my $RESET  = RESET()   || '';
+my $YELLOW = YELLOW()  || '';
+my $CYAN   = CYAN()    || '';
+my $RED    = RED()     || '';
+my $GREEN  = GREEN()   || '';
+my $BLUE   = BLUE()    || '';
+my $WHITE  = WHITE()   || '';
+my $BOLD   = BOLD()    || '';
+
+if ( ! $ARGV[0] && ! @file ) {
+        HELP_MESSAGE();
+        exit(0);
+};
+
+if (@file) {
+	@file = split(/,/,join(',',@file));
+	foreach $file (@file) {
+        	local $/;       # same as 'local undef $/;' enables "slurp mode" to read entire file
+		$myFile = $file;
+        	open(INPUTFILE, "$myFile") or die "$!";
+       		while (<INPUTFILE>) {
+                	chomp $_;
+                	$line = $_;
+                	last if $line eq "done";
+               		$string = $_;
+                	$string =~ s/\R*$//;    # removes last linebreak/newline
+
+			URLfile() 	if $opts{URL};
+			urlfile() 	if $opts{url};
+			BASE64file() 	if $opts{BASE64};
+			base64file() 	if $opts{base64};
+			HTMLfile() 	if $opts{HTML};
+			htmlfile() 	if $opts{html};
+			HEXfile() 	if $opts{HEX};
+			xfile() 	if $opts{hex};
+			INTfile() 	if $opts{INT};   # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
+			ifile() 	if $opts{int};     # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
+			INTBfile() 	if $opts{INTB};
+			bintfile() 	if $opts{bint};
+			FLOATHfile() 	if $opts{FLOATH};
+			hfloatfile() 	if $opts{hfloat};
+			octhfile() 	if $opts{octh};
+			HOCTfile() 	if $opts{HOCT};
+			nintfile() 	if $opts{nint};
+			NHEXfile() 	if $opts{NHEX}; #  ./hURL -n -- -77
+			netfile() 	if $opts{net};
+			NETfile() 	if $opts{NET};
+			binhfile() 	if $opts{binh};
+			hexbfile() 	if $opts{hexb};
+			sha1file() 	if $opts{SHA1};
+			sha224file() 	if $opts{SHA224};
+			sha256file() 	if $opts{SHA256};
+			sha384file() 	if $opts{SHA384};
+			sha512file() 	if $opts{SHA512};
+			md5file() 	if $opts{md5};
+			string2stackfile() if $opts{stack};
+        	}
+        	close(INPUTFILE);
 	}
-	close(INPUTFILE);
+@file = undef;
 }
 
-U() if $opt{U};
-u() if $opt{u};
-X() if $opt{X};
-x() if $opt{x};
-md() if $opt{m};
-B() if $opt{B};
-b() if $opt{b};
-H() if $opt{H};
-h() if $opt{h};
-I() if $opt{I}; # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
-i() if $opt{i}; # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
-T() if $opt{T};
-t() if $opt{t};
-F() if $opt{F};
-l() if $opt{l};
-o() if $opt{o};
-O() if $opt{O};
-n() if $opt{n};
-N() if $opt{N}; #  ./hURL -n -- -77
-e() if $opt{e};
-E() if $opt{E};
-bin0() if $opt{0};
-bin1() if $opt{1};
-sha1() if $opt{2};
-sha224() if $opt{3};
-sha256() if $opt{4};
-sha384() if $opt{5};
-sha512() if $opt{6};
+#pod2usage(-verbose=>2) if $opts{H};
+URL() 		if $opts{URL};
+url() 		if $opts{url};
+BASE64() 	if $opts{BASE64};
+base64() 	if $opts{base64};
+HTML() 		if $opts{HTML};
+html() 		if $opts{html};
+HEX() 		if $opts{HEX};
+x() 		if $opts{hex};
+INT() 		if $opts{INT};   # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
+i() 		if $opts{int};     # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
+INTB() 		if $opts{INTB};
+bint() 		if $opts{bint};
+FLOATH() 	if $opts{FLOATH};
+hfloat() 	if $opts{hfloat};
+octh() 		if $opts{octh};
+HOCT() 		if $opts{HOCT};
+nint() 		if $opts{nint};
+NHEX() 		if $opts{NHEX}; #  ./hURL -n -- -77
+net() 		if $opts{net};
+NET() 		if $opts{NET};
+binh() 		if $opts{binh};
+hexb() 		if $opts{hexb};
+sha1() 		if $opts{SHA1};
+sha224() 	if $opts{SHA224};
+sha256() 	if $opts{SHA256};
+sha384() 	if $opts{SHA384};
+sha512() 	if $opts{SHA512};
+md5() 		if $opts{md5};
+string2stack() 	if $opts{stack};
 
-sub U {
-	if (($opt{s}) && ($ARGV[0])) {
+sub URL {
+        if (($opts{suppress}) && ($ARGV[0])) {
+                $string = $ARGV[0];
+                print BOLD(), CGI::escape("$string"), RESET();
+        } elsif (($ARGV[0])) {
+                $string = $ARGV[0];
+                print BOLD(), BLUE(), "\nOriginal    :: ",  RESET(), BOLD(), "$string\n", RESET();
+                print BOLD(), CYAN(), "URL ENcoded :: ", RESET(), BOLD(), CGI::escape("$string") . "\n", RESET();
+        }
+}
+
+sub URLfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), CGI::escape("$string"), "\n", RESET();
+	} else {
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "URL ENcoded   :: ", RESET(), BOLD(), CGI::escape("$string") . "\n", RESET();
+	}
+}
+
+sub url {
+        if (($opts{suppress}) && ($ARGV[0])) {
+                $string = $ARGV[0];
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), "$string", RESET();
+        } elsif ($ARGV[0]) {
+                $string = $ARGV[0];
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), BLUE(), "\nOriginal    :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "URL DEcoded :: ", RESET(), BOLD(), "$string\n", RESET();
+        }
+}
+
+sub urlfile {
+	if (($opts{suppress}) && ($file)) {
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), "$string", "\n", RESET();
+	} else {
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "URL DEcoded  :: ", RESET(), BOLD(), "$string\n", RESET();
+        }
+}
+
+sub HEX {
+	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
-		print BOLD, CGI::escape("$string") . "\n". RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, CGI::escape("$string") . "\n". RESET;
+		$myStringHex = unpack("H*", $string);
+		print BOLD(), "$myStringHex", RESET();
 	} elsif ($ARGV[0]) {
 		$string = $ARGV[0];
-		print BOLD, BLUE, "\nOriginal    :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "URL ENcoded :: " . RESET, BOLD, CGI::escape("$string") . "\n". RESET;
-	} else {
-		print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "URL ENcoded   :: " . RESET, BOLD, CGI::escape("$string") . "\n". RESET;
+		$myStringHex = unpack("H*", $string);
+		print BOLD(), BLUE(), "\nOriginal    :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "Hex ENcoded :: ", RESET(), BOLD(), "$myStringHex\n", RESET();
 	}
 }
 
-sub u {
-	if (($opt{s}) && ($ARGV[0])) {
-		$string = $ARGV[0];
-		$string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
-		print BOLD, "$string\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		$string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
-		print BOLD, "$string\n", RESET;
-	} elsif ($ARGV[0]) {
-		$string = $ARGV[0];
-		$string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
-		print BOLD, BLUE, "\nOriginal    :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-		print BOLD, CYAN, "URL DEcoded :: " . RESET, BOLD, "$string\n", RESET;
+sub HEXfile {
+	if (($opts{suppress}) && ($file)) {
+                $myStringHex = unpack("H*", $string);
+                print BOLD(), "$myStringHex", "\n", RESET();
 	} else {
-		$string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
-		print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "URL DEcoded  :: " . RESET, BOLD, "$string\n", RESET;
-	}
-}
-
-sub X {
-	if (($opt{s}) && ($ARGV[0])) {
-		$string = $ARGV[0];
-		$myStringHex = unpack("H*", $string);
-		print BOLD, "$myStringHex\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		$myStringHex = unpack("H*", $string);
-		print BOLD, "$myStringHex\n", RESET;
-	} elsif ($ARGV[0]) {
-		$string = $ARGV[0];
-		$myStringHex = unpack("H*", $string);
-		print BOLD, BLUE, "\nOriginal    :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "Hex ENcoded :: " . RESET, BOLD, "$myStringHex\n", RESET;
-	} else {
-		$myStringHex = unpack("H*", $string);
-		print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "Hex ENcoded   :: " . RESET, BOLD, "$myStringHex\n", RESET;
-	}
+                $myStringHex = unpack("H*", $string);
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Hex ENcoded   :: ", RESET(), BOLD(), "$myStringHex\n", RESET();
+        }
 }
 
 sub x {
-	if (($opt{s}) && ($ARGV[0])) {
+	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
 		while($string =~ /(.{2})/sg) {
-			print BOLD, chr(hex($1)), RESET;
+			print BOLD(), chr(hex($1)), RESET();
 		}
-		print "\n";
-	} elsif (($opt{s}) && ($opt{f})) {
-		while($string =~ /(.{2})/sg) {
-			print BOLD, chr(hex($1)), RESET;
-		}
-		print "\n";
 	} elsif ($ARGV[0]) {
 		$string = $ARGV[0];
-		print BOLD, BLUE, "\nOriginal HEX  :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "ASCII DEcoded :: " . RESET;
+		print BOLD(), BLUE(), "\nOriginal HEX  :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "ASCII DEcoded :: ", RESET();
+
 		while($string =~ /(.{2})/sg) {
-			print BOLD, chr(hex($1)), RESET;
-		}
-		print "\n";
-	} else {
-		print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "ASCII DEcoded :: " . RESET;
-		while($string =~ /(.{2})/sg) {
-			print BOLD, chr(hex($1)), RESET;
+			print BOLD(), chr(hex($1)), RESET();
 		}
 		print "\n";
 	}
 }
 
-sub md {
-	if (($opt{s}) && ($ARGV[0])) {
+sub xfile {
+	if (($opts{suppress}) && ($file)) {
+                while($string =~ /(.{2})/sg) {
+                        print BOLD(), chr(hex($1)), "\n", RESET();
+                }
+	} else {
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "ASCII DEcoded :: ", RESET();
+                while($string =~ /(.{2})/sg) {
+                        print BOLD(), chr(hex($1)), RESET();
+
+                }
+                print "\n";
+        }
+}
+
+sub md5 {
+	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
 		$myStringmd5 = md5_hex($string);
-		print BOLD, "$myStringmd5\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-                my $file = shift || "$opt{f}";
+		print BOLD(), "$myStringmd5", RESET();
+	} elsif ($ARGV[0]) {
+		$string = $ARGV[0];
+		$myStringmd5 = md5_hex($string);
+		print BOLD(), BLUE(), "\nOriginal   :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "MD5 digest :: ", RESET(), BOLD(), "$myStringmd5\n", RESET();
+        }
+}
+
+sub md5file {
+	if (($opts{suppress}) && ($file)) {
+                my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD, Digest::MD5->new->addfile(*FILE)->hexdigest, "\n", RESET;
-	} elsif ($ARGV[0]) {
-		$string = $ARGV[0];
-		$myStringmd5 = md5_hex($string);
-		print BOLD, BLUE, "\nOriginal   :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "MD5 digest :: " . RESET, BOLD, "$myStringmd5\n", RESET;
-	} else {
-		print BOLD, BLUE, "\nOriginal file      :: " . RESET, BOLD, "$opt{f}\n", RESET;
-    		my $file = shift || "$opt{f}";
-	        open(FILE, $file) or die "Can't open '$file': $!";
-   	        binmode(FILE);
-    		print BOLD, CYAN, "MD5 digest of file :: " . Digest::MD5->new->addfile(*FILE)->hexdigest, "\n";
+                print BOLD(), Digest::MD5->new->addfile(*FILE)->hexdigest, "\n", RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file      :: ", RESET(), BOLD(), "$file\n", RESET();
+                my $file = shift || "$file";
+                open(FILE, $file) or die "Can't open '$file': $!";
+                binmode(FILE);
+                print BOLD(), CYAN(), "MD5 digest of file :: " . Digest::MD5->new->addfile(*FILE)->hexdigest, "\n";
         }
 }
 
-sub B {
-	if (($opt{s}) && ($ARGV[0])) {
+sub BASE64 {
+	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
 		$myStringb64 = MIME::Base64::encode($string);
-		print BOLD, "$myStringb64\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		$myStringb64 = MIME::Base64::encode($string);
-		print BOLD, "$myStringb64\n", RESET;
+		print BOLD(), "$myStringb64", RESET();
 	} elsif ($ARGV[0]) {
 		$string = $ARGV[0];
 		$myStringb64 = MIME::Base64::encode($string);
-		print BOLD, BLUE, "\nOriginal       :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "base64 ENcoded :: " . RESET, BOLD, "$myStringb64\n", RESET;
-	} else {
-		$myStringb64 = MIME::Base64::encode($string);
-		print BOLD, BLUE, "\nOriginal file       :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "base64 ENcoded file :: " . RESET, BOLD, "$myStringb64\n", RESET;
+		print BOLD(), BLUE(), "\nOriginal       :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "base64 ENcoded :: ", RESET(), BOLD(), "$myStringb64", RESET();
 	}
 }
 
-sub b {
-	if (($opt{s}) && ($ARGV[0])) {
-		$string = $ARGV[0];
-		$myStringb64d = MIME::Base64::decode($string);
-		print BOLD, "$myStringb64d\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		$myStringb64d = MIME::Base64::decode($string);
-		print BOLD, "$myStringb64d\n", RESET;
-	} elsif ($ARGV[0]) {
-		$string = $ARGV[0];
-		$myStringb64d = MIME::Base64::decode($string);
-		print BOLD, BLUE, "\nOriginal string       :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "base64 DEcoded string :: " . RESET, BOLD, "$myStringb64d\n", RESET;
-	} else {
-		$myStringb64d = MIME::Base64::decode($string);
-		print BOLD, BLUE, "\nOriginal file       :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "base64 DEcoded file :: " . RESET, BOLD, "$myStringb64d\n", RESET;
+sub BASE64file {
+	if (($opts{suppress}) && ($file)) {
+                $myStringb64 = MIME::Base64::encode($string);
+                print BOLD(), "$myStringb64", RESET();
+        } else {
+                $myStringb64 = MIME::Base64::encode($string);
+                print BOLD(), BLUE(), "\nOriginal file       :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "base64 ENcoded file :: ", RESET(), BOLD(), "$myStringb64", "\n", RESET();
         }
 }
 
-sub H {
-	if (($opt{s}) && ($ARGV[0])) {
+sub base64 {
+	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
-		$myStringhe = encode_entities($string);
-		print BOLD, "$myStringhe\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		$myStringhe = encode_entities($string);
-		print BOLD, "$myStringhe\n", RESET;
+		$myStringb64d = MIME::Base64::decode($string);
+		print BOLD(), "$myStringb64d", RESET();
 	} elsif ($ARGV[0]) {
 		$string = $ARGV[0];
-		$myStringhe = encode_entities($string);
-		print BOLD, BLUE, "\nOriginal     :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "HTML ENcoded :: " . RESET, BOLD, "$myStringhe\n", RESET;
-	} else {
-		$myStringhe = encode_entities($string);
-		print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "HTML ENcoded  :: " . RESET, BOLD, "$myStringhe\n", RESET;
+		$myStringb64d = MIME::Base64::decode($string);
+		print BOLD(), BLUE(), "\nOriginal string       :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "base64 DEcoded string :: ", RESET(), BOLD(), "$myStringb64d\n", RESET();
         }
 }
 
-sub h {
-	if (($opt{s}) && ($ARGV[0])) {
-		$string = $ARGV[0];
-		$myStringhd = decode_entities($string);
-		print BOLD, "$myStringhd\n", RESET;
-	} elsif (($opt{s}) && ($opt{f})) {
-		$myStringhd = decode_entities($string);
-		print BOLD, "$myStringhd\n", RESET;
-	} elsif ($ARGV[0]) {
-		$string = $ARGV[0];
-		$myStringhd = decode_entities($string);
-		print BOLD, BLUE, "\nOriginal     :: " . RESET, BOLD, "$string\n", RESET;
-		print BOLD, CYAN, "HTML DEcoded :: " . RESET, BOLD, "$myStringhd\n", RESET;
-	} else {
-		$myStringhd = decode_entities($string);
-		print BOLD, BLUE, "\nOriginal file :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		print BOLD, CYAN, "HTML DEcoded  :: " . RESET, BOLD, "$myStringhd\n", RESET;
+sub base64file {
+	if (($opts{suppress}) && ($file)) {
+                $myStringb64d = MIME::Base64::decode($string);
+                print BOLD(), "$myStringb64d", RESET();
+        } else {
+                $myStringb64d = MIME::Base64::decode($string);
+                print BOLD(), BLUE(), "\nOriginal file       :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "base64 DEcoded file :: ", RESET(), BOLD(), "$myStringb64d\n", RESET();
         }
 }
 
-sub I {
-        if (($opt{s}) && ($ARGV[0])) {
+sub HTML {
+	if (($opts{suppress}) && ($ARGV[0])) {
+		$string = $ARGV[0];
+		$myStringhe = encode_entities($string);
+		print BOLD(), "$myStringhe", RESET();
+	} elsif ($ARGV[0]) {
+		$string = $ARGV[0];
+		$myStringhe = encode_entities($string);
+		print BOLD(), BLUE(), "\nOriginal     :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "HTML ENcoded :: ", RESET(), BOLD(), "$myStringhe\n", RESET();
+        }
+}
+
+sub HTMLfile {
+	if (($opts{suppress}) && ($file)) {
+                $myStringhe = encode_entities($string);
+                print BOLD(), "$myStringhe", RESET();
+        } else {
+                $myStringhe = encode_entities($string);
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "HTML ENcoded  :: ", RESET(), BOLD(), "$myStringhe\n", RESET();
+        }
+}
+
+sub html {
+	if (($opts{suppress}) && ($ARGV[0])) {
+		$string = $ARGV[0];
+		$myStringhd = decode_entities($string);
+		print BOLD(), "$myStringhd", RESET();
+	} elsif ($ARGV[0]) {
+		$string = $ARGV[0];
+		$myStringhd = decode_entities($string);
+		print BOLD(), BLUE(), "\nOriginal     :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "HTML DEcoded :: ", RESET(), BOLD(), "$myStringhd\n", RESET();
+        }
+}
+
+sub htmlfile {
+	if (($opts{suppress}) && ($file)) {
+                $myStringhd = decode_entities($string);
+                print BOLD(), "$myStringhd", RESET();
+        } else {
+                $myStringhd = decode_entities($string);
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "HTML DEcoded  :: ", RESET(), BOLD(), "$myStringhd\n", RESET();
+        }
+}
+
+sub INT {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $int = $ARGV[0];
-                print BOLD, sprintf("0x%x", "$int") . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                print BOLD, sprintf("0x%x", "$string") . "\n", RESET;
+                print BOLD(), sprintf("0x%x", "$int"), RESET();
         } elsif ($ARGV[0]) {
                 $int = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal integer :: " . RESET, BOLD, "$int\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, sprintf("0x%x", "$int") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal integer :: ", RESET(), BOLD(), "$int\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), sprintf("0x%x", "$int") . "\n", RESET();
+        }
+}
+
+sub INTfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), sprintf("0x%x", "$string"), RESET();
         } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, sprintf("0x%x", "$string") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), sprintf("0x%x", "$string") . "\n", RESET();
         }
 }
 
 sub i {
-        if (($opt{s}) && ($ARGV[0])) {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $hexi = $ARGV[0];
-                print BOLD, hex("$hexi") . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                print BOLD, hex("$string") . "\n", RESET;
+                print BOLD(), hex("$hexi"), RESET();
         } elsif ($ARGV[0]) {
                 $hexi = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal hex         :: " . RESET, BOLD, "$hexi\n", RESET;
-                print BOLD, CYAN, "Converted to integer :: " . RESET, BOLD, hex("$hexi") . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file        :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to integer :: " . RESET, BOLD, hex("$string") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal hex         :: ", RESET(), BOLD(), "$hexi\n", RESET();
+                print BOLD(), CYAN(), "Converted to integer :: ", RESET(), BOLD(), hex("$hexi") . "\n", RESET();
         }
 }
 
-sub n {
-        if (($opt{s}) && ($ARGV[0])) {
+sub ifile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), hex("$string"), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file        :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to integer :: ", RESET(), BOLD(), hex("$string") . "\n", RESET();
+        }
+}
+
+sub nint {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $inth = $ARGV[0];
-                print BOLD, sprintf("%X", "$inth") . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                print BOLD, sprintf("%X", "$string") . "\n", RESET;
+                print BOLD(), sprintf("%X", "$inth"), RESET();
         } elsif ($ARGV[0]) {
                 $inth = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal -integer :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to hex  :: " . RESET, BOLD, sprintf("%X", "$inth") . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, sprintf("%X", "$string") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal -integer :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex  :: ", RESET(), BOLD(), sprintf("%X", "$inth") . "\n", RESET();
         }
 }
 
-sub N {
-        if (($opt{s}) && ($ARGV[0])) {
+sub nintfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), sprintf("%X", "$string"), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), sprintf("%X", "$string") . "\n", RESET();
+        }
+}
+
+sub NHEX {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $intn = $ARGV[0];
-                print BOLD, unpack("i", pack("i", hex($intn))) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                print BOLD, unpack("i", pack("i", hex($string))) . "\n", RESET;
+                print BOLD(), unpack("i", pack("i", hex($intn))), RESET();
         } elsif ($ARGV[0]) {
                 $intn = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal -hex    :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to int :: " . RESET, BOLD, unpack("i", pack("i", hex("$intn"))) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal -hex    :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to int :: ", RESET(), BOLD(), unpack("i", pack("i", hex("$intn"))) . "\n", RESET();
+	}
+}
+
+sub NHEXfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), unpack("i", pack("i", hex($string))), RESET();
         } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to int :: " . RESET, BOLD, unpack("i", pack("i", hex("$string"))) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to int :: ", RESET(), BOLD(), unpack("i", pack("i", hex("$string"))) . "\n", RESET();
         }
 }
 
-sub T {
-        if (($opt{s}) && ($ARGV[0])) {
+sub INTB {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $bin = $ARGV[0];
-                print BOLD, sprintf("%b", "$bin") . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                print BOLD, sprintf("%b", "$string") . "\n", RESET;
+                print BOLD(), sprintf("%b", "$bin"), RESET();
         } elsif ($ARGV[0]) {
                 $bin = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal integer    :: " . RESET, BOLD, "$bin\n", RESET;
-                print BOLD, CYAN, "Converted to binary :: " . RESET, BOLD, sprintf("%08b", "$bin") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal integer    :: ", RESET(), BOLD(), "$bin\n", RESET();
+                print BOLD(), CYAN(), "Converted to binary :: ", RESET(), BOLD(), sprintf("%08b", "$bin") . "\n", RESET();
+	}
+}
+
+sub INTBfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), sprintf("%b", "$string"), RESET();
         } else {
-                print BOLD, BLUE, "\nOriginal file       :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to binary :: " . RESET, BOLD, sprintf("%b", "$string") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal file       :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to binary :: ", RESET(), BOLD(), sprintf("%b", "$string") . "\n", RESET();
         }
 }
 
-sub t {
-        if (($opt{s}) && ($ARGV[0])) {
+sub bint {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $bini = $ARGV[0];
-                print BOLD, bin2dec("$bini") . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, bin2dec("$string") . "\n", RESET;
+                print BOLD(), bin2dec("$bini"), RESET();
         } elsif ($ARGV[0]) {
                 $bini = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal binary      :: " . RESET, BOLD, "$bini\n", RESET;
-                print BOLD, CYAN, "Converted to integer :: " . RESET, BOLD, bin2dec("$bini") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal binary      :: ", RESET(), BOLD(), "$bini\n", RESET();
+                print BOLD(), CYAN(), "Converted to integer :: ", RESET(), BOLD(), bin2dec("$bini") . "\n", RESET();
+	}
+}
+
+sub bintfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), bin2dec("$string"), RESET();
         } else {
-                print BOLD, BLUE, "\nOriginal file        :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to integer :: " . RESET, BOLD, bin2dec("$string") . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal file        :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to integer :: ", RESET(), BOLD(), bin2dec("$string") . "\n", RESET();
         }
 }
 
@@ -363,307 +597,609 @@ sub bin2dec { # transform a string of binary into an integer
 }
 
 
-sub F {
-        if (($opt{s}) && ($ARGV[0])) {
+sub FLOATH {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $floath = $ARGV[0];
-                print BOLD, "0x" . unpack("H*", pack("f*", "$floath")) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, "0x" . unpack("H*", pack("f*", "$string")) . "\n", RESET;
+                print BOLD(), "0x" . unpack("H*", pack("f*", "$floath")), RESET();
         } elsif ($ARGV[0]) {
                 $floath = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal float   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, "0x" . unpack("H*", pack("f*", "$floath")) . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, unpack("H*", pack("f*", "$string")) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal float   :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), "0x" . unpack("H*", pack("f*", "$floath")) . "\n", RESET();
         }
 }
 
-
-sub l {
-        if (($opt{s}) && ($ARGV[0])) {
-                $hexf = $ARGV[0];
-                print BOLD, sprintf("%f", hex("$hexf")) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                $hexf = $string;
-		print BOLD, sprintf("%f", hex("$string")) . "\n", RESET;
-        } elsif ($ARGV[0]) {
-                $hexf = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal hex       :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to float :: " . RESET, BOLD, sprintf("%f", hex("$hexf")) . "\n", RESET;
+sub FLOATHfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), "0x" . unpack("H*", pack("f*", "$string")), RESET();
         } else {
-                $hexf = $string;
-                print BOLD, BLUE, "\nOriginal file      :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to float :: " . RESET, BOLD, sprintf("%f", hex("$string")) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal file   :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), unpack("H*", pack("f*", "$string")) . "\n", RESET();
         }
 }
 
-sub o {
-        if (($opt{s}) && ($ARGV[0])) {
+sub hfloat {
+        if (($opts{suppress}) && ($ARGV[0])) {
+                $hexf = $ARGV[0];
+                print BOLD(), sprintf("%f", hex("$hexf")), RESET();
+        } elsif ($ARGV[0]) {
+                $hexf = $ARGV[0];
+                print BOLD(), BLUE(), "\nOriginal hex       :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to float :: ", RESET(), BOLD(), sprintf("%f", hex("$hexf")) . "\n", RESET();
+        }
+}
+
+sub hfloatfile {
+	if (($opts{suppress}) && ($file)) {
+                $hexf = $string;
+                print BOLD(), sprintf("%f", hex("$string")), RESET();
+        } else {
+                $hexf = $string;
+                print BOLD(), BLUE(), "\nOriginal file      :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to float :: ", RESET(), BOLD(), sprintf("%f", hex("$string")) . "\n", RESET();
+        }
+}
+
+sub octh {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $octh = $ARGV[0];
-                print BOLD, "0x" . sprintf( "%x", oct("$octh")) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, "0x" . sprintf( "%x", oct("$string")) . "\n", RESET;
+                print BOLD(), "0x" . sprintf( "%x", oct("$octh")), RESET();
         } elsif ($ARGV[0]) {
                 $octh = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal oct     :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, "0x" . sprintf( "%x", oct("$octh")) . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, "0x" . sprintf( "%x", oct("$string")) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal oct     :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), "0x" . sprintf( "%x", oct("$octh")) . "\n", RESET();
 	}
 }
 
-sub O {
-        if (($opt{s}) && ($ARGV[0])) {
+sub octhfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), "0x" . sprintf( "%x", oct("$string")), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), "0x" . sprintf( "%x", oct("$string")) . "\n", RESET();
+        }
+}
+
+sub HOCT {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $hexo = $ARGV[0];
 		$hexo =~ s/0x//i;
-                print BOLD, sprintf("%o", hex($hexo)) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                $hexo = $string;
-		$hexo =~ s/0x//i;
-		print BOLD, sprintf("%o", hex($hexo)) . "\n", RESET;
+                print BOLD(), sprintf("%o", hex($hexo)), RESET();
         } elsif ($ARGV[0]) {
                 $hexo = $ARGV[0];
 		$hexo =~ s/0x//i;
-                print BOLD, BLUE, "\nOriginal hex     :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to oct :: " . RESET, BOLD, sprintf("%o", hex($hexo)) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal hex     :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to oct :: ", RESET(), BOLD(), sprintf("%o", hex($hexo)) . "\n", RESET();
+	}
+}
+
+sub HOCTfile {
+	if (($opts{suppress}) && ($file)) {
+                $hexo = $string;
+                $hexo =~ s/0x//i;
+                print BOLD(), sprintf("%o", hex($hexo)), RESET();
         } else {
                 $hexo = $string;
-		$hexo =~ s/0x//i;
-                print BOLD, BLUE, "\nOriginal hex     :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to oct :: " . RESET, BOLD, sprintf("%o", hex($hexo)) . "\n", RESET;
-	}
+                $hexo =~ s/0x//i;
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to oct :: ", RESET(), BOLD(), sprintf("%o", hex($hexo)) . "\n", RESET();
+        }
 }
 
-sub bin0 {
-        if (($opt{s}) && ($ARGV[0])) {
+sub binh {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $binh = $ARGV[0];
-                print BOLD, sprintf("0x%x", oct("0b$binh")) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, sprintf("0x%x", oct("0b$string")) . "\n", RESET;
+                print BOLD(), sprintf("0x%x", oct("0b$binh")), RESET();
         } elsif ($ARGV[0]) {
                 $binh = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal bin     :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, sprintf("0x%x", oct("0b$binh")) . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to hex :: " . RESET, BOLD, sprintf("0x%x", oct("0b$string")) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal bin     :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), sprintf("0x%x", oct("0b$binh")) . "\n", RESET();
 	}
 }
 
-sub e {
-        if (($opt{s}) && ($ARGV[0])) {
+sub binhfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), sprintf("0x%x", oct("0b$string")), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to hex :: ", RESET(), BOLD(), sprintf("0x%x", oct("0b$string")) . "\n", RESET();
+        }
+}
+
+sub net {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $neth = $ARGV[0];
-                print BOLD, unpack("H4*", pack("vN", "$neth")) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, unpack("H4*", pack("vN", "$string")) . "\n", RESET;
+                print BOLD(), unpack("H4*", pack("vN", "$neth")), RESET();
         } elsif ($ARGV[0]) {
                 $neth = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal int                   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "To hex (in network byte order) :: " . RESET, BOLD, unpack("H4*", pack("vN", "$neth")) . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file                  :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "To hex (in network byte order) :: " . RESET, BOLD, unpack("H4*", pack("vN", "$string")) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal int                   :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "To hex (in network byte order) :: ", RESET(), BOLD(), unpack("H4*", pack("vN", "$neth")) . "\n", RESET();
 	}
 }
 
-sub E {
-        if (($opt{s}) && ($ARGV[0])) {
+sub netfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), unpack("H4*", pack("vN", "$string")), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file                  :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "To hex (in network byte order) :: ", RESET(), BOLD(), unpack("H4*", pack("vN", "$string")) . "\n", RESET();
+        }
+}
+
+sub NET {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $net = $ARGV[0];
-                print BOLD, unpack("vN", pack("H*","$net")) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, unpack("vN", pack("H*","$string")) . "\n", RESET;
+                print BOLD(), unpack("vN", pack("H*","$net")), RESET();
         } elsif ($ARGV[0]) {
                 $net = $ARGV[0];
-                print BOLD, BLUE, "\nHex (in network byte order) :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to int            :: " . RESET, BOLD, unpack("vN", pack("H*","$net")) . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to int :: " . RESET, BOLD, unpack("vN", pack("H*","$string")) . "\n", RESET;
+                print BOLD(), BLUE(), "\nHex (in network byte order) :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to int            :: ", RESET(), BOLD(), unpack("vN", pack("H*","$net")) . "\n", RESET();
 	}
+}
+
+sub NETfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), unpack("vN", pack("H*","$string")), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to int :: ", RESET(), BOLD(), unpack("vN", pack("H*","$string")) . "\n", RESET();
+        }
 }
 
 sub sha1 {
-        if (($opt{s}) && ($ARGV[0])) {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $sha = $ARGV[0];
  		$sha1 = Digest::SHA::sha1_hex("$sha");
-                print BOLD, "$sha1" . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		my $file = shift || "$opt{f}";
-                open(FILE, $file) or die "Can't open '$file': $!";
-                binmode(FILE);
-                print BOLD, Digest::SHA->new->addfile(*FILE)->hexdigest . "\n", RESET;
+                print BOLD(), "$sha1" . RESET();
         } elsif ($ARGV[0]) {
                 $sha = $ARGV[0];
  		$sha1 = Digest::SHA::sha1_hex("$sha");
-                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "SHA1 checksum   :: " . RESET, BOLD, "$sha1" . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file         :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                my $file = shift || "$opt{f}";
+                print BOLD(), BLUE(), "\nOriginal file   :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "SHA1 checksum   :: ", RESET(), BOLD(), "$sha1" . "\n", RESET();
+	}
+}
+
+sub sha1file {
+	if (($opts{suppress}) && ($file)) {
+                my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD, CYAN, "SHA1 checksum of file :: " . RESET, BOLD, Digest::SHA->new->addfile(*FILE)->hexdigest . "\n", RESET;
-	}
+                print BOLD(), Digest::SHA->new->addfile(*FILE)->hexdigest . "\n", RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file         :: ", RESET(), BOLD(), "$file\n", RESET();
+                my $file = shift || "$file";
+                open(FILE, $file) or die "Can't open '$file': $!";
+                binmode(FILE);
+                print BOLD(), CYAN(), "SHA1 checksum of file :: ", RESET(), BOLD(), Digest::SHA->new->addfile(*FILE)->hexdigest . "\n", RESET();
+        }
 }
 
 sub sha224 {
-        if (($opt{s}) && ($ARGV[0])) {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $sha24 = $ARGV[0];
  		$sha224 = Digest::SHA::sha224_hex("$sha24");
-                print BOLD, "$sha224" . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-                my $file = shift || "$opt{f}";
-                open(FILE, $file) or die "Can't open '$file': $!";
-                binmode(FILE);
-                print BOLD, Digest::SHA->new(224)->addfile(*FILE)->hexdigest . "\n", RESET;
+                print BOLD(), "$sha224" . RESET();
         } elsif ($ARGV[0]) {
                 $sha24 = $ARGV[0];
  		$sha224 = Digest::SHA::sha224_hex("$sha24");
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "SHA224 checksum  :: " . RESET, BOLD, "$sha224" . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		my $file = shift || "$opt{f}";
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "SHA224 checksum  :: ", RESET(), BOLD(), "$sha224" . "\n", RESET();
+	}
+}
+
+sub sha224file {
+	if (($opts{suppress}) && ($file)) {
+                my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD, CYAN, "SHA224 checksum of file :: " . RESET, BOLD, Digest::SHA->new(224)->addfile(*FILE)->hexdigest . "\n", RESET;
-	}
+                print BOLD(), Digest::SHA->new(224)->addfile(*FILE)->hexdigest . "\n", RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file           :: ", RESET(), BOLD(), "$file\n", RESET();
+                my $file = shift || "$file";
+                open(FILE, $file) or die "Can't open '$file': $!";
+                binmode(FILE);
+                print BOLD(), CYAN(), "SHA224 checksum of file :: ", RESET(), BOLD(), Digest::SHA->new(224)->addfile(*FILE)->hexdigest . "\n", RESET();
+        }
 }
 
 sub sha256 {
-        if (($opt{s}) && ($ARGV[0])) {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $sha2 = $ARGV[0];
  		$sha256 = Digest::SHA::sha256_hex("$sha2");
-                print BOLD, "$sha256" . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		my $file = shift || "$opt{f}";
-                open(FILE, $file) or die "Can't open '$file': $!";
-                binmode(FILE);
-                print BOLD, Digest::SHA->new(256)->addfile(*FILE)->hexdigest . "\n", RESET;
-
+                print BOLD(), "$sha256" . RESET();
         } elsif ($ARGV[0]) {
                 $sha2 = $ARGV[0];
  		$sha256 = Digest::SHA::sha256_hex("$sha2");
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "SHA256 checksum  :: " . RESET, BOLD, "$sha256" . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		my $file = shift || "$opt{f}";
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "SHA256 checksum  :: ", RESET(), BOLD(), "$sha256" . "\n", RESET();
+	}
+}
+
+sub sha256file {
+	if (($opts{suppress}) && ($file)) {
+                my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD, CYAN, "SHA256 checksum of file :: " . RESET, BOLD, Digest::SHA->new(256)->addfile(*FILE)->hexdigest . "\n", RESET;
-	}
+                print BOLD(), Digest::SHA->new(256)->addfile(*FILE)->hexdigest . "\n", RESET();
+	} else {
+                print BOLD(), BLUE(), "\nOriginal file           :: ", RESET(), BOLD(), "$file\n", RESET();
+                my $file = shift || "$file";
+                open(FILE, $file) or die "Can't open '$file': $!";
+                binmode(FILE);
+                print BOLD(), CYAN(), "SHA256 checksum of file :: ", RESET(), BOLD(), Digest::SHA->new(256)->addfile(*FILE)->hexdigest . "\n", RESET();
+        }
 }
 
 sub sha384 {
-        if (($opt{s}) && ($ARGV[0])) {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $sha3 = $ARGV[0];
  		$sha384 = Digest::SHA::sha384_hex("$sha3");
-                print BOLD, "$sha384" . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		my $file = shift || "$opt{f}";
-                open(FILE, $file) or die "Can't open '$file': $!";
-                binmode(FILE);
-                print BOLD, Digest::SHA->new(384)->addfile(*FILE)->hexdigest . "\n", RESET;
+                print BOLD(), "$sha384" . RESET();
         } elsif ($ARGV[0]) {
                 $sha3 = $ARGV[0];
  		$sha384 = Digest::SHA::sha384_hex("$sha3");
-                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "SHA384 checksum :: " . RESET, BOLD, "$sha384" . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		my $file = shift || "$opt{f}";
+                print BOLD(), BLUE(), "\nOriginal file   :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "SHA384 checksum :: ", RESET(), BOLD(), "$sha384" . "\n", RESET();
+	}
+}
+
+sub sha384file {
+	if (($opts{suppress}) && ($file)) {
+                my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD, CYAN, "SHA384 checksum of file :: " . RESET, BOLD, Digest::SHA->new(384)->addfile(*FILE)->hexdigest . "\n", RESET;
-	}
+                print BOLD(), Digest::SHA->new(384)->addfile(*FILE)->hexdigest . "\n", RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file           :: ", RESET(), BOLD(), "$file\n", RESET();
+                my $file = shift || "$file";
+                open(FILE, $file) or die "Can't open '$file': $!";
+                binmode(FILE);
+                print BOLD(), CYAN(), "SHA384 checksum of file :: ", RESET(), BOLD(), Digest::SHA->new(384)->addfile(*FILE)->hexdigest . "\n", RESET();
+        }
 }
 
 sub sha512 {
-        if (($opt{s}) && ($ARGV[0])) {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $sha5 = $ARGV[0];
  		$sha512 = Digest::SHA::sha512_hex("$sha5");
-                print BOLD, "$sha512" . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		my $file = shift || "$opt{f}";
-                open(FILE, $file) or die "Can't open '$file': $!";
-                binmode(FILE);
-                print BOLD, Digest::SHA->new(512)->addfile(*FILE)->hexdigest . "\n", RESET;
+                print BOLD(), "$sha512" . RESET();
         } elsif ($ARGV[0]) {
                 $sha5 = $ARGV[0];
  		$sha512 = Digest::SHA::sha512_hex("$sha5");
-                print BOLD, BLUE, "\nOriginal file   :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "SHA512 checksum :: " . RESET, BOLD, "$sha512" . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file           :: " . RESET, BOLD, "$opt{f}\n", RESET;
-		my $file = shift || "$opt{f}";
+                print BOLD(), BLUE(), "\nOriginal string :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "SHA512 checksum :: ", RESET(), BOLD(), "$sha512" . "\n", RESET();
+	}
+}
+
+sub sha512file {
+	if (($opts{suppress}) && ($file)) {
+                my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD, CYAN, "SHA512 checksum of file :: " . RESET, BOLD, Digest::SHA->new(512)->addfile(*FILE)->hexdigest . "\n", RESET;
-	}
+                print BOLD(), Digest::SHA->new(512)->addfile(*FILE)->hexdigest . "\n", RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file           :: ", RESET(), BOLD(), "$file\n", RESET();
+                my $file = shift || "$file";
+                open(FILE, $file) or die "Can't open '$file': $!";
+                binmode(FILE);
+                print BOLD(), CYAN(), "SHA512 checksum of file :: ", RESET(), BOLD(), Digest::SHA->new(512)->addfile(*FILE)->hexdigest . "\n", RESET();
+        }
 }
 
-sub bin1 {
-        if (($opt{s}) && ($ARGV[0])) {
+sub hexb {
+        if (($opts{suppress}) && ($ARGV[0])) {
                 $hexb = $ARGV[0];
-                print BOLD, sprintf("%b", hex($hexb)) . "\n", RESET;
-        } elsif (($opt{s}) && ($opt{f})) {
-		print BOLD, sprintf("%b", hex($string)) . "\n", RESET;
+                print BOLD(), sprintf("%b", hex($hexb)), RESET();
         } elsif ($ARGV[0]) {
                 $hexb = $ARGV[0];
-                print BOLD, BLUE, "\nOriginal hex     :: " . RESET, BOLD, "$ARGV[0]\n", RESET;
-                print BOLD, CYAN, "Converted to bin :: " . RESET, BOLD, sprintf("%b", hex($hexb)) . "\n", RESET;
-        } else {
-                print BOLD, BLUE, "\nOriginal file    :: " . RESET, BOLD, "$opt{f}\n", RESET;
-                print BOLD, CYAN, "Converted to bin :: " . RESET, BOLD, sprintf("%b", hex($string)) . "\n", RESET;
+                print BOLD(), BLUE(), "\nOriginal hex     :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to bin :: ", RESET(), BOLD(), sprintf("%b", hex($hexb)) . "\n", RESET();
 	}
 }
 
-sub main::VERSION_MESSAGE { $fh = shift;
-	print $fh ".::[" . RESET, BOLD, " hURL - hexadecimal & URL (en/de)coder v2.0 " . RESET, "]::.\n";
+sub hexbfile {
+	if (($opts{suppress}) && ($file)) {
+                print BOLD(), sprintf("%b", hex($string)), RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file    :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to bin :: ", RESET(), BOLD(), sprintf("%b", hex($string)) . "\n", RESET();
+        }
 }
 
-sub main::HELP_MESSAGE { $fh = shift; 
-	print $fh BOLD, RED, "  USAGE: ", RESET;
-	print $fh BOLD, BLUE, "$0 " . BOLD, BLUE, "[" . BOLD, CYAN, "U" . BOLD, BLUE, "|" . BOLD, CYAN, "u" . BOLD, BLUE, "|" . BOLD, CYAN, "B" . BOLD, BLUE, "|" . BOLD, CYAN, "b" . BOLD, BLUE, "|" . BOLD, CYAN, "H" . BOLD, BLUE, "|" . BOLD, CYAN, "h" . BOLD, BLUE, "|" . BOLD, CYAN, "X" . BOLD, BLUE, "|" . BOLD, CYAN, "x" . BOLD, BLUE, "|" . BOLD, CYAN, "I" . BOLD, BLUE, "|" . BOLD, CYAN, "i" . BOLD, BLUE, "|" . BOLD, CYAN, BOLD, CYAN, "n" . BOLD, BLUE, "|" . BOLD, CYAN, "N" . BOLD, BLUE, "|" . BOLD, CYAN, "T" . BOLD, BLUE, "|" . BOLD, CYAN, "t" . BOLD, BLUE, "|" . BOLD, CYAN, "F" . BOLD, BLUE, "|" . BOLD, CYAN, "l" . BOLD, BLUE, "|" . BOLD, CYAN, "o" . BOLD, BLUE, "|" . BOLD, CYAN, "O" . BOLD, BLUE, "|" . BOLD, CYAN, "0" . BOLD, BLUE, "|" . BOLD, CYAN, "1" . BOLD, BLUE, "|" . BOLD, CYAN, "2" . BOLD, BLUE, "|" . BOLD, CYAN, "3" . BOLD, BLUE, "|" . BOLD, CYAN, "4" . BOLD, BLUE, "|" . BOLD, CYAN, "5" . BOLD, BLUE, "|" . BOLD, CYAN, "6" . BOLD, BLUE, "|" . BOLD, CYAN, "m" . BOLD, BLUE, "|" . BOLD, CYAN, "e" . BOLD, BLUE, "|" . BOLD, CYAN, "E" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "-s" . BOLD, BLUE, "]" . BOLD, BLUE, " [" . BOLD, CYAN, "string" . BOLD, BLUE, "|" . BOLD, CYAN, "-f <filename>" . BOLD, BLUE, "]\n", RESET;
-	print "\n";
-	print $fh "\tCOMMAND LINE ARGUMENTS\n", RESET;
-	print $fh BOLD, BLUE, "\t-U " . RESET, BOLD, BLUE, "\t" . RESET "=> " . BOLD, "U" . RESET, "RL encode", RESET, "\t\t;  $0 -U \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-u " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "u" . RESET, "RL decode", RESET, "\t\t;  $0 -u \"hello%20world\"\n";
-	print $fh BOLD, BLUE, "\t-B " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "B" . RESET, "ase64 encode", RESET, "\t;  $0 -B \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-b " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "b" . RESET, "ase64 decode", RESET, "\t;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
-	print $fh BOLD, BLUE, "\t-H " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "H" . RESET, "TML encode", RESET, "\t\t;  $0 -H \"<hello world>\"\n";
-	print $fh BOLD, BLUE, "\t-h " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "h" . RESET, "TML decode", RESET, "\t\t;  $0 -h \"&lt;hello world&gt;\"\n";
-	print $fh BOLD, BLUE, "\t-X " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> ascii ->  he" . BOLD, "X" . RESET, "\t;  $0 -X \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-x " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> he" . BOLD, "x" . RESET, "   ->  ascii", RESET, "\t;  $0 -x \"68656c6c6f20776f726c64\"\n";
-	print $fh BOLD, BLUE, "\t-I " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "I" . RESET, "nt   ->  hex", RESET, "\t;  $0 -I \"10\"\n";
-	print $fh BOLD, BLUE, "\t-i " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> hex   ->  " . BOLD, "i" . RESET, "nt", RESET, "\t;  $0 -i \"0xa\"\n";
-	print $fh BOLD, BLUE, "\t-n " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> -i" . BOLD, "n" . RESET, "t  ->  hex", RESET, "\t;  $0 -n -- -77\n";
-	print $fh BOLD, BLUE, "\t-N " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> -hex  ->  i" . BOLD, "N" . RESET, "t", RESET, "\t;  $0 -N 0xffffffb3\n";
-	print $fh BOLD, BLUE, "\t-T " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> in" . BOLD, "T" . RESET, "   ->  bin", RESET, "\t;  $0 -T 30\n";
-	print $fh BOLD, BLUE, "\t-t " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> bin   ->  in" . BOLD, "t" . RESET, "\t;  $0 -t 1010\n";
-	print $fh BOLD, BLUE, "\t-F " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "F" . RESET, "loat ->  hex", RESET, "\t;  $0 -F 3.33\n";
-	print $fh BOLD, BLUE, "\t-l " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> hex   ->  f" . BOLD, "l" . RESET, "oat", RESET, "\t;  $0 -l 0x40551ed8\n";
-	print $fh BOLD, BLUE, "\t-o " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "o" . RESET, "ctal ->  hex", RESET, "\t;  $0 -o 35\n";
-	print $fh BOLD, BLUE, "\t-O " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> hex   ->  " . BOLD, "O" . RESET, "ctal", RESET, "\t;  $0 -O 0x12\n";
-	print $fh BOLD, BLUE, "\t-0 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> bin   -> " . BOLD, "" . RESET, " hex", RESET, "\t;  $0 -0 1100011\n";
-	print $fh BOLD, BLUE, "\t-1 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> hex   -> " . BOLD, "" . RESET, " bin", RESET, "\t;  $0 -1 0x63\n";
-	print $fh BOLD, BLUE, "\t-2 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> SHA" . BOLD, "1" . RESET, " checksum", RESET, "\t;  $0 -2 \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-3 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> SHA" . BOLD, "2" . RESET, "24 checksum", RESET, "\t;  $0 -3 \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-4 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> SHA" . BOLD, "2" . RESET, "56 checksum", RESET, "\t;  $0 -4 \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-5 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> SHA38" . BOLD, "4" . RESET, " checksum", RESET, "\t;  $0 -5 \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-6 " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> SHA" . BOLD, "5" . RESET, "12 checksum", RESET, "\t;  $0 -6 \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-m " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> " . BOLD, "m" . RESET, "d5 digest", RESET, "\t\t;  $0 -m \"hello world\"\n";
-	print $fh BOLD, BLUE, "\t-e " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> int -> hex (n" . BOLD, "e" . RESET, "twork-byte order)", RESET, "\t;  $0 -e 4444\n";
-	print $fh BOLD, BLUE, "\t-E " . RESET, BOLD, "" . BOLD, BLUE, "\t" . RESET "=> hex (n" . BOLD, "E" . RESET, "twork-byte order) ->  int", RESET, "\t;  $0 -E 5c11\n";
-	print $fh "\n";
-	print $fh BOLD, BLUE, "\t-s " . RESET, BOLD, "" . BOLD, BLUE, "\t\t" . RESET "=> " . BOLD, "s" . RESET, "uppress (display result " . RESET, BOLD, "only" . RESET ")\n", RESET;
-	print $fh BOLD, BLUE, "\t-f <" . RESET, BOLD, "filename" . BOLD, BLUE, ">\t" . RESET "=> use a file as input, instead of a string on the command-line\n", RESET;
-	print $fh BOLD, BLUE, "\t--help\t\t" . RESET, "=> displays help\n";
-	print $fh BOLD, BLUE, "\t--version\t" . RESET, "=> displays version information\n";
-	print $fh "\n";
-	print $fh "\t\tEXAMPLES:  " . BOLD, BLUE, "$0 -b -s \"aGVsbG8gd29ybGQ=\"\n", RESET;
-	print $fh "\t\t           " . BOLD, BLUE, "$0 -X -f /var/www/meterpreter.php\n", RESET;
+sub string2stack {
+        if (($opts{suppress}) && ($ARGV[0])) {
+		str2stksuppress($string);
+        } elsif ($ARGV[0]) {
+		str2stk($string);
+	}
 }
+
+sub string2stackfile {
+	if (($opts{suppress}) && ($file)) {
+		str2stksuppress($string);
+		print "\n";
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file", RESET();
+		str2stk($string);
+        }
+}
+
+
+sub str2stk ($) {
+		if ($file) {
+			$strToPush=$string;
+		} else {
+			$strToPush=$ARGV[0];
+		}
+		$strThisChar="";
+		$strThisHex="";
+		$cnt=0;
+		$bytecnt=0;
+		$strHex="";
+		$strOpcodes="";
+		$strPush="";
+		$hexWord="";
+		print BOLD(), BLUE(), "\nString length :: " . RESET(), BOLD(), length($strToPush)."\n", RESET();
+		print BOLD(), CYAN(), "Opcodes to push this string onto the stack + terminating NULL BYTE (\\x00) ::\n\n", RESET();
+		while ($cnt < length($strToPush))
+		{
+		  $strThisChar=substr($strToPush,$cnt,1);
+		  $strThisHex="\\x".ascii_to_hex($strThisChar);
+		  if ($bytecnt < 3)
+		  {
+		     $strHex=$strHex.$strThisHex;
+		         $bytecnt=$bytecnt+1;
+		  }
+		  else
+		  {
+		    $strPush = $strHex.$strThisHex;
+		    $strPush =~ tr/\\x//d;
+  		    $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+		    $strHex=chr(34)."\\x68".$strHex.$strThisHex.chr(34).
+		        "    //PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
+		        substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+
+		    $strOpcodes=$strHex."\n".$strOpcodes;
+		    $strHex="";
+		        $bytecnt=0;
+		  }
+		  $cnt=$cnt+1;
+		}
+		#last line
+		if (length($strHex) > 0)
+		{
+		  while(length($strHex) < 12)
+		  {
+		    $strHex=$strHex."\\x20";
+		  }
+		  $strPush = $strHex;
+		  $strPush =~ tr/\\x//d;
+                  $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+		  $strHex=chr(34)."\\x68".$strHex."\\x00".chr(34)."    //PUSH 0x00".
+		  substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+		  $strOpcodes=$strHex."\n".$strOpcodes;
+		}
+		else
+		{
+		  #add line with spaces + null byte (string terminator)
+		  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20\\x00".chr(34)."    //PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+		}
+		print $strOpcodes;
+}
+
+sub str2stksuppress ($) {
+		if ($file) {
+			$strToPush=$string;
+		} else {
+			$strToPush=$ARGV[0];
+		}
+		$strThisChar="";
+		$strThisHex="";
+		$cnt=0;
+		$bytecnt=0;
+		$strHex="";
+		$strOpcodes="";
+		$strPush="";
+		$hexWord="";
+		while ($cnt < length($strToPush))
+		{
+		  $strThisChar=substr($strToPush,$cnt,1);
+		  $strThisHex="\\x".ascii_to_hex($strThisChar);
+		  if ($bytecnt < 3)
+		  {
+		     $strHex=$strHex.$strThisHex;
+		         $bytecnt=$bytecnt+1;
+		  }
+		  else
+		  {
+		    $strPush = $strHex.$strThisHex;
+		    $strPush =~ tr/\\x//d;
+  		    $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+		    $strHex=chr(34)."\\x68".$strHex.$strThisHex.chr(34).
+		        "    //PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
+		        substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+
+		    $strOpcodes=$strHex."\n".$strOpcodes;
+		    $strHex="";
+		        $bytecnt=0;
+		  }
+		  $cnt=$cnt+1;
+		}
+		#last line
+		if (length($strHex) > 0)
+		{
+		  while(length($strHex) < 12)
+		  {
+		    $strHex=$strHex."\\x20";
+		  }
+		  $strPush = $strHex;
+		  $strPush =~ tr/\\x//d;
+                  $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+		  $strHex=chr(34)."\\x68".$strHex."\\x00".chr(34)."    //PUSH 0x00".
+		  substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+		  $strOpcodes=$strHex."\n".$strOpcodes;
+		}
+		else
+		{
+		  #add line with spaces + null byte (string terminator)
+		  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20\\x00".chr(34)."    //PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+		}
+		print $strOpcodes;
+}
+
+sub ascii_to_hex ($)    
+{
+   (my $str = shift) =~ s/(.|\n)/sprintf("%02lx", ord $1)/eg;
+   return $str;
+}
+
+sub hex2ascii ($)
+{
+   (my $str = shift) =~ s/"    \/\/PUSH 0x"//g;
+   $str =~ s/([a-fA-F0-9]{2})/chr(hex $1)/eg;
+   return $str;
+}
+
+#my $FOOBAR = print BOLD(), BLUE "Text\n";
+
+
+__DATA__
+=head1 NAME
+
+  .::[ hURL - hexadecimal & URL (en/de)coder v2.1 ]::.
+
+=head1 SYNOPSIS
+
+  hURL [U|u|B|b|H|h|X|x|I|i|n|N|T|t|F|l|o|O|0|1|2|3|4|5|6|m|e|E] [-s] [string|-f <filename>]
+
+=head1 ARGUMENTS
+
+  ARGZ  
+	E<number>	 ASCII character code
+
+	Recent versions of Getopt::Long provide the HelpMessage and VersionMessage subroutines.
+	HelpMessage is essentially a wrapper around pod2usage, while VersionMessage emulates pod2usage syn-
+	tax and options, but it is fully contained within Getopt::Long. See Chapter 14 for more information.
+
+
+	Pod::Text::Color		Convert POD to text using ANSI color sequences. The basis of the
+					-color option to pod2text. Subclassed from Pod::Text. This uses
+					Term::ANSIColor, which must be installed (see Chapter 15).
+
+E<61>shabbaE<99>
+C<red>shabba123
+
+	/usr/share/perl5/core_perl/Pod/Text/Color.pm
+		..=head1.. level one headings bold
+		..=head2.. level two headings bold
+		sub cmd_b { return colored ($_[2], 'bold')   }
+		sub cmd_f { return colored ($_[2], 'cyan')   }
+		sub cmd_i { return colored ($_[2], 'yellow') }
+		# Output any included code in green.
+
+	/usr/share/perl5/core_perl/Term/ANSIColor.pm
+	        CLEAR         . RESET() .           BOLD()            DARK
+	        FAINT           UNDERLINE         UNDERSCORE      BLINK
+	        REVERSE         CONCEALED
+
+        	BLACK           RED               GREEN           YELLOW
+	        BLUE            MAGENTA           CYAN            WHITE
+	        ON_BLACK        ON_RED            ON_GREEN        ON_YELLOW
+	        ON_BLUE         ON_MAGENTA        ON_CYAN         ON_WHITE
+
+        	BRIGHT_BLACK    BRIGHT_RED        BRIGHT_GREEN    BRIGHT_YELLOW
+       		BRIGHT_BLUE     BRIGHT_MAGENTA    BRIGHT_CYAN     BRIGHT_WHITE
+        	ON_BRIGHT_BLACK ON_BRIGHT_RED     ON_BRIGHT_GREEN ON_BRIGHT_YELLOW
+        	ON_BRIGHT_BLUE  ON_BRIGHT_MAGENTA ON_BRIGHT_CYAN  ON_BRIGHT_WHITE
+
+
+
+	* FILES get processed before $ARGV[0] no matter what
+		-U "ii ii" -f ii -f i
+		-U -f ii -f i "ii ii"
+	* MULTIPLE files can be used on the command-line
+		-f <file> -f <file>
+
+=head1 DESCRIPTION
+
+=pod
+
+This is a B<paragraph> that uses I<italic> and B<bold> markup using the
+BE<lt>textE<gt> and IE<lt>text<gt> interior sequences. Here is an example
+code fragment: C<substr $text,0,1> and here is a filename: F</usr/bin/perl>.
+All these things are of course represented in a style entirely up to the
+translator. See L<perlpod> for more information.
+
+=cut
+
+=over 4
+
+=item Stay Alert
+
+this is the description of the first stay alert
+
+=item Trust No one
+
+=item Keep yr laser Handy
+
+=back
+
+=for text
+This is a paragraph that will appear in documents produced by the pod2text format.
+
+=for html <font color = red>
+<p>But this will appear in <b>HTML</b> documents
+</font>
+
+	COMMAND LINE ARGUMENTS
+	-U 	=> URL encode		;  ./hURL -U "hello world"
+	-u 	=> uRL decode		;  ./hURL -u "hello%20world"
+	-B 	=> Base64 encode	;  ./hURL -B "hello world"
+	-b 	=> base64 decode	;  ./hURL -b "aGVsbG8gd29ybGQ="
+	-H 	=> HTML encode		;  ./hURL -H "<hello world>"
+	-h 	=> hTML decode		;  ./hURL -h "&lt;hello world&gt;"
+	-X 	=> ascii ->  heX	;  ./hURL -X "hello world"
+	-x 	=> hex   ->  ascii	;  ./hURL -x "68656c6c6f20776f726c64"
+	-I 	=> Int   ->  hex	;  ./hURL -I "10"
+	-i 	=> hex   ->  int	;  ./hURL -i "0xa"
+	-n 	=> -int  ->  hex	;  ./hURL -n -- -77
+	-N 	=> -hex  ->  iNt	;  ./hURL -N 0xffffffb3
+	-T 	=> inT   ->  bin	;  ./hURL -T 30
+	-t 	=> bin   ->  int	;  ./hURL -t 1010
+	-F 	=> Float ->  hex	;  ./hURL -F 3.33
+	-l 	=> hex   ->  float	;  ./hURL -l 0x40551ed8
+	-o 	=> octal ->  hex	;  ./hURL -o 35
+	-O 	=> hex   ->  Octal	;  ./hURL -O 0x12
+	-0 	=> bin   ->  hex	;  ./hURL -0 1100011
+	-1 	=> hex   ->  bin	;  ./hURL -1 0x63
+	-2 	=> SHA1 checksum	;  ./hURL -2 "hello world"
+	-3 	=> SHA224 checksum	;  ./hURL -3 "hello world"
+	-4 	=> SHA256 checksum	;  ./hURL -4 "hello world"
+	-5 	=> SHA384 checksum	;  ./hURL -5 "hello world"
+	-6 	=> SHA512 checksum	;  ./hURL -6 "hello world"
+	-m 	=> md5 digest		;  ./hURL -m "hello world"
+	-e 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
+	-E 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
+
+	-s 		=> suppress (display result only)
+	-f <filename>	=> use a file as input, instead of a string on the command-line
+	--help		=> displays help
+	--version	=> displays version information
+
+		EXAMPLES:  ./hURL -b -s "aGVsbG8gd29ybGQ="
+		           ./hURL -X -f /var/www/meterpreter.php
+
+
+    -h  --help              Display this help
+    -H  --man               Display detailed help (examples)
+
+=head1 AUTHOR
+
+fnord0 - L<http://seethefnords.net/>
+
+=head1 EXAMPLES
+
+=head2 First Example...
