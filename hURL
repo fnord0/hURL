@@ -8,8 +8,8 @@
 # 05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: http://corelan.be|pvePushString.pl)
 # 05202012 => Getopt::Long for better command-line support
 # 05202012 => --man option for extended documentation done using Pod::Usage
-# 05202012 => color|nocolor optional support added
-# 05212012 => multi-file support (-f <file1> -f <file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
+# 05212012 => color|nocolor optional support added
+# 05212012 => multi-file support (-f <file1>,<file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
 #######################################################
 # copyleft - fnord0@riseup.net
 
