@@ -8,14 +8,19 @@
 # 05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: http://corelan.be|pvePushString.pl)
 # 05202012 => Getopt::Long for better command-line support
 # 05202012 => --man option for extended documentation done using Pod::Usage
-# 05212012 => color|nocolor optional support added
+# 05202012 => color|nocolor optional support added
 # 05212012 => multi-file support (-f <file1>,<file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
+# 05272012 => ROT13 encode + decode
+
+## /home/fnord0/h4x/shellcode/ <- good scripts, check em for ideas
+## shellcodeexec ? 
+## winexec > /usr/src/metasploit/external/source/shellcode/windows/msf2/win32_stage_winexec.asm
 #######################################################
 # copyleft - fnord0@riseup.net
 
 use strict;
-#use warnings;
-use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $parser/;
+use warnings;
+use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $rot13 $parser/;
 $|++;
 use Getopt::Long qw(:config bundling no_ignore_case);
 use Pod::Usage;
@@ -117,7 +122,9 @@ GetOptions(\%opts,
    'SHA256|4'	=> \$opts{SHA256},
    'SHA384|5'	=> \$opts{SHA384},
    'SHA512|6'	=> \$opts{SHA512},
-   'stack|7'	=> \$opts{stack},
+   'ROT13|7'	=> \$opts{ROT13},
+   'rot13|8'	=> \$opts{rot13},
+   'stack|9'	=> \$opts{stack},
    'net|e'	=> \$opts{net},
    'NET|E'	=> \$opts{NET},
    'suppress|s'	=> \$opts{suppress},
@@ -214,6 +221,8 @@ if (@file) {
 			sha256file() 	if $opts{SHA256};
 			sha384file() 	if $opts{SHA384};
 			sha512file() 	if $opts{SHA512};
+			rot13file()	if $opts{ROT13};
+			unrot13file()	if $opts{rot13};
 			md5file() 	if $opts{md5};
 			string2stackfile() if $opts{stack};
         	}
@@ -250,6 +259,8 @@ sha224() 	if $opts{SHA224};
 sha256() 	if $opts{SHA256};
 sha384() 	if $opts{SHA384};
 sha512() 	if $opts{SHA512};
+rot13() 	if $opts{ROT13};
+unrot13() 	if $opts{rot13};
 md5() 		if $opts{md5};
 string2stack() 	if $opts{stack};
 #podtextcolor()	if $opts{man};
@@ -928,6 +939,55 @@ sub hexbfile {
         }
 }
 
+sub rot13 {
+        if (($opts{suppress}) && ($ARGV[0])) {
+                $string = $ARGV[0];
+		$string =~ tr[a-zA-Z][n-za-mN-ZA-M];
+                print BOLD(), "$string", RESET();
+        } elsif ($ARGV[0]) {
+                $string = $ARGV[0];
+		$string =~ tr[a-zA-Z][n-za-mN-ZA-M];
+                print BOLD(), BLUE(), "\nOriginal string    :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "Converted to ROT13 :: ", RESET(), BOLD(), "$string\n", RESET();
+        }
+}
+
+sub rot13file {
+	if (($opts{suppress}) && ($file)) {
+		$string =~ tr[a-zA-Z][n-za-mN-ZA-M];
+                print BOLD(), $string, RESET();
+        } else {
+		$string =~ tr[a-zA-Z][n-za-mN-ZA-M];
+                print BOLD(), BLUE(), "\nOriginal file      :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "Converted to ROT13 :: ", RESET(), BOLD(), "$string\n", RESET()
+	}
+}
+
+sub unrot13 {
+        if (($opts{suppress}) && ($ARGV[0])) {
+		$string = $ARGV[0];
+		$string =~ tr[n-za-mN-ZA-M][a-zA-Z];
+                print BOLD(), "$string", RESET();
+        } elsif ($ARGV[0]) {
+                $string = $ARGV[0];
+                $string =~ tr[n-za-mN-ZA-M][a-zA-Z];
+                print BOLD(), BLUE(), "\nOriginal string   :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "ROT13 decoded     :: ", RESET(), BOLD(), "$string\n", RESET();
+        }
+	
+}
+
+sub unrot13file {
+        if (($opts{suppress}) && ($file)) {
+                $string =~ tr[n-za-mN-ZA-M][a-zA-Z];
+                print BOLD(), "$string", RESET();
+        } else {
+                $string =~ tr[n-za-mN-ZA-M][a-zA-Z];
+                print BOLD(), BLUE(), "\nOriginal file   :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "ROT13 decoded   :: ", RESET(), BOLD(), "$string\n", RESET()
+	}
+}
+
 sub string2stack {
         if (($opts{suppress}) && ($ARGV[0])) {
 		str2stksuppress($string);
@@ -1168,8 +1228,39 @@ C<red>shabba123
 	  HOST         Host to connect
 	  PORT         Port to listen or connect
 
+
+>>> awmtt
+awmtt [ start | stop | restart | -h | -e | -t [ get | change | list | random ] ] [ -C /path/to/rc.lua ] [ -D display ] [ -S windowsize ]
+
+  start			Spawn nested Awesome via Xephyr
+  stop			Stops Xephyr
+	all		Stop all instances of Xephyr 
+  restart		Restart nested Awesome
+  -N|--notest		Don't use a testfile but your actual rc.lua (i.e. /home/fnord0/.config/awesome/rc.lua)
+  -C|--config		Specify configuration file
+  -D|--display		Specify the display to use (e.g. 1)
+  -S|--size		Specify the window size
+  -e|--execute		Execute command in nested Awesome
+  -t|--theme		Control the current theme
+	c|change	Change theme										<<<<<------ TAB = just controlling current theme options
+	p|print		Print themename										<<<<<------  ""                 ""                    ""
+	l|list		List available themes									<<<<<------  ""                 ""                    ""
+	r|random	Choose random theme									<<<<<------  ""                 ""                    ""
+  -h|--help		Show this help text
+  
+examples:
+awmtt start -D 3 -C /etc/xdg/awesome/rc.lua -S 1280x800
+awmtt -t change zenburn
+awmtt start (uses defaults)
+
+The defaults are -D 1 -C /home/fnord0/.config/awesome/rc.lua.test -S 1024x640.
+
+
+
+
 B<USE perltidy + perlcritic> (--brutal --theme=pbp)
 	       /usr/bin/vendor_perl/perlcritic --brutal --theme=pbp hURL-getoptlong
+		tab=4
 
 =head1 DESCRIPTION
 
@@ -1202,7 +1293,12 @@ This is a paragraph that will appear in documents produced by the pod2text forma
 <p>But this will appear in <b>HTML</b> documents
 </font>
 
+=head1 USAGE
+
+I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]> I<[> B<string> I<]>
+
 	COMMAND LINE ARGUMENTS
+
 	-U|--URL 	=> URL encode				;  ./hURL -U "hello world"
 	-u|--url 	=> uRL decode				;  ./hURL -u "hello%20world"
 	-B|--BASE64 	=> Base64 encode			;  ./hURL -B "hello world"
@@ -1228,28 +1324,44 @@ This is a paragraph that will appear in documents produced by the pod2text forma
 	-4|--SHA256 	=> SHA256 checksum			;  ./hURL -4 "hello world"
 	-5|--SHA384 	=> SHA384 checksum			;  ./hURL -5 "hello world"
 	-6|--SHA512 	=> SHA512 checksum			;  ./hURL -6 "hello world"
-	-7|--stack	=> push string 2 stack (corelanc0d3r)	;  ./hURL -7 "hello world"
+	-7|--ROT13	=> ROT13 encode				;  ./hURL -7 "hello world"
+	-8|--rot13	=> ROT13 decode				;  ./hURL -8 "uryyb jbeyq"
+	-9|--stack	=> push string 2 stack (corelanc0d3r)	;  ./hURL -9 "hello world"
 	     --esc  :: output in escaped string	{default}	;  "\x00\x01\x02\x03\x04\x05 ..."
 	     --pair :: output in hexpairs format		;  000102030405060708090a0b0c0d0e0f ...
 	     --C    :: output in C format			;  unsigned char shellcode[] = { 0x00, 0x01, 0x02, ... 0x0b, };
 	-m|--md5 	=> md5 digest				;  ./hURL -m "hello world"
 	-e|--net 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
 	-E|--NET 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
-
 	-s|--suppress			=> suppress (display result only)
-	-f|--file <file1>,<file2>	=> use a file as input, instead of a string on the command-line
 	--color|--nocolor		=> enable/disable colored output [default is ENABLED]
 	--help				=> displays help
 	--man				=> displays extended help
 	--version			=> displays version information
 
-		EXAMPLES:  ./hURL -b -s "aGVsbG8gd29ybGQ="
-		           ./hURL -X -f /var/www/meterpreter.php
+	-f|--file <file1>,<file2>	=> use (a) file(s) as input
+	[string]			=> string as input
 
 =head1 AUTHOR
 
-fnord0 - L<http://seethefnords.net/>
+ fnord0 <AT> RISEUP <DOT> NET  
 
 =head1 EXAMPLES
 
-=head2 First Example...
+=head2 First Example :: BASE64 decode using suppression option...
+
+F<./hURL -b -s "aGVsbG8gd29ybGQ=">
+
+=head2 Second Example :: take file PHP meterpreter as input and convert to hexadecimal...
+
+F<./hURL -X -f /var/www/meterpreter.php>
+
+=head2 Third Example :: Multiple files as input
+
+F<./hURL -Xf <file1E<gt>,<file2E<gt>,<file3E<gt>>
+
+=head2 Forth Example :: Multiple files as input + string on command line {files WILL BE TRANSFORMED BEFORE THE STRING} + multiple flag manipulators
+
+F<./hURL -23456s -f <file1E<gt>,<file2E<gt> "hello wolrd">
+
+
