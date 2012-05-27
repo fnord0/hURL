@@ -5,22 +5,20 @@
 # 06162011 => added HTML encode + decode
 # 06172011 => added "-s" supress (minimal mode). combine with other tools (i.e. msfvenom)
 # 04242012 => SHA1/224/256/384/512 + MORE, script becomes similar in vein to radare's rax(2) base conversion tool
-# 05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: pvePushString.pl)
+# 05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: http://corelan.be|pvePushString.pl)
 # 05202012 => Getopt::Long for better command-line support
 # 05202012 => --man option for extended documentation done using Pod::Usage
 # 05202012 => color|nocolor optional support added
-# 05212012 => multi-file support  +  bundling of multi-file && string on cmdline
+# 05212012 => multi-file support (-f <file1> -f <file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
 #######################################################
 # copyleft - fnord0@riseup.net
 
 use strict;
 #use warnings;
-use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord/;
+use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $parser/;
 $|++;
 use Getopt::Long qw(:config bundling no_ignore_case);
 use Pod::Usage;
-#use Pod::Text;
-use Pod::Text::Color;
 use CGI;
 use URI::Escape;
 use Digest::MD5 qw(md5_hex);
@@ -43,52 +41,52 @@ sub VERSION_MESSAGE {
 sub HELP_MESSAGE {
 	VERSION_MESSAGE();
 	print BOLD(), RED(), "\n  USAGE: ", RESET();
-	print BOLD(), BLUE(), "$0 " . BOLD(), BLUE(), "[" . BOLD(), CYAN(), "U" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "u" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "B" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "b" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "H" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "h" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "X" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "x" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "I" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "i" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), BOLD(), CYAN(), "n" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "N" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "T" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "t" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "F" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "l" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "o" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "O" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "0" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "1" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "2" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "3" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "4" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "5" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "6" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "m" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "e" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "E" . BOLD(), BLUE(), "]" . BOLD(), BLUE(), " [" . BOLD(), CYAN(), "-s" . BOLD(), BLUE(), "]" . BOLD(), BLUE(), " [" . BOLD(), CYAN(), "string" . BOLD(), BLUE(), "|" . BOLD(), CYAN(), "-f <filename>" . BOLD(), BLUE(), "]\n", RESET();
+	print BOLD(), BLUE(), "$0 ", BOLD(), BLUE(), "[", BOLD(), CYAN(), "U", BOLD(), BLUE(), "|", BOLD(), CYAN(), "u", BOLD(), BLUE(), "|", BOLD(), CYAN(), "B", BOLD(), BLUE(), "|", BOLD(), CYAN(), "b", BOLD(), BLUE(), "|", BOLD(), CYAN(), "H", BOLD(), BLUE(), "|", BOLD(), CYAN(), "h", BOLD(), BLUE(), "|", BOLD(), CYAN(), "X", BOLD(), BLUE(), "|", BOLD(), CYAN(), "x", BOLD(), BLUE(), "|", BOLD(), CYAN(), "I", BOLD(), BLUE(), "|", BOLD(), CYAN(), "i", BOLD(), BLUE(), "|", BOLD(), CYAN(), BOLD(), CYAN(), "n", BOLD(), BLUE(), "|", BOLD(), CYAN(), "N", BOLD(), BLUE(), "|", BOLD(), CYAN(), "T", BOLD(), BLUE(), "|", BOLD(), CYAN(), "t", BOLD(), BLUE(), "|", BOLD(), CYAN(), "F", BOLD(), BLUE(), "|", BOLD(), CYAN(), "l", BOLD(), BLUE(), "|", BOLD(), CYAN(), "o", BOLD(), BLUE(), "|", BOLD(), CYAN(), "O", BOLD(), BLUE(), "|", BOLD(), CYAN(), "0", BOLD(), BLUE(), "|", BOLD(), CYAN(), "1", BOLD(), BLUE(), "|", BOLD(), CYAN(), "2", BOLD(), BLUE(), "|", BOLD(), CYAN(), "3", BOLD(), BLUE(), "|", BOLD(), CYAN(), "4", BOLD(), BLUE(), "|", BOLD(), CYAN(), "5", BOLD(), BLUE(), "|", BOLD(), CYAN(), "6", BOLD(), BLUE(), "|", BOLD(), CYAN(), "m", BOLD(), BLUE(), "|", BOLD(), CYAN(), "e", BOLD(), BLUE(), "|", BOLD(), CYAN(), "E", BOLD(), BLUE(), "]", BOLD(), BLUE(), " [", BOLD(), CYAN(), "-s", BOLD(), BLUE(), "]", BOLD(), BLUE(), " [", BOLD(), CYAN(), "string", BOLD(), BLUE(), "|", BOLD(), CYAN(), "-f <filename>", BOLD(), BLUE(), "]\n", RESET();
 	print "\n";
 	print "\tCOMMAND LINE ARGUMENTS\n", RESET();
-	print BOLD(), BLUE(), "\t-U ", RESET(), BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "U", RESET(), "RL encode", RESET(), "\t\t;  $0 -U \"hello world\"\n";
-	print BOLD(), BLUE(), "\t-u ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "u", RESET(), "RL decode", RESET(), "\t\t;  $0 -u \"hello%20world\"\n";
-	print BOLD(), BLUE(), "\t-B ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "B", RESET(), "ase64 encode", RESET(), "\t;  $0 -B \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-b ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "b", RESET(), "ase64 decode", RESET(), "\t;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
-        print BOLD(), BLUE(), "\t-H ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "H", RESET(), "TML encode", RESET(), "\t\t;  $0 -H \"<hello world>\"\n";
-        print BOLD(), BLUE(), "\t-h ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "h", RESET(), "TML decode", RESET(), "\t\t;  $0 -h \"&lt;hello world&gt;\"\n";
-        print BOLD(), BLUE(), "\t-X ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> ascii ->  he" . BOLD(), "X", RESET(), "\t;  $0 -X \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-x ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> he" . BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t;  $0 -x \"68656c6c6f20776f72664\"\n";
-        print BOLD(), BLUE(), "\t-I ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "I", RESET(), "nt   ->  hex", RESET(), "\t;  $0 -I \"10\"\n";
-        print BOLD(), BLUE(), "\t-i ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  " . BOLD(), "i", RESET(), "nt", RESET(), "\t;  $0 -i \"0xa\"\n";
-        print BOLD(), BLUE(), "\t-n ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> -i" . BOLD(), "n", RESET(), "t  ->  hex", RESET(), "\t;  $0 -n -- -77\n";
-        print BOLD(), BLUE(), "\t-N ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> -hex  ->  i" . BOLD(), "N", RESET(), "t", RESET(), "\t;  $0 -N 0xffffffb3\n";
-        print BOLD(), BLUE(), "\t-T ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> in" . BOLD(), "T", RESET(), "   ->  bin", RESET(), "\t;  $0 -T 30\n";
-        print BOLD(), BLUE(), "\t-t ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> bin   ->  in" . BOLD(), "t", RESET(), "\t;  $0 -t 1010\n";
-        print BOLD(), BLUE(), "\t-F ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "F", RESET(), "loat ->  hex", RESET(), "\t;  $0 -F 3.33\n";
-        print BOLD(), BLUE(), "\t-l ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  f" . BOLD(), "l", RESET(), "oat", RESET(), "\t;  $0 -l 0x40551ed8\n";
-        print BOLD(), BLUE(), "\t-o ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "o", RESET(), "ctal ->  hex", RESET(), "\t;  $0 -o 35\n";
-        print BOLD(), BLUE(), "\t-O ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  " . BOLD(), "O", RESET(), "ctal", RESET(), "\t;  $0 -O 0x12\n";
-        print BOLD(), BLUE(), "\t-0 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> bin   -> " . BOLD(), "", RESET(), " hex", RESET(), "\t;  $0 -0 1100011\n";
-        print BOLD(), BLUE(), "\t-1 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex   -> " . BOLD(), "", RESET(), " bin", RESET(), "\t;  $0 -1 0x63\n";
-        print BOLD(), BLUE(), "\t-2 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA1 checksum", RESET(), "\t;  $0 -2 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-3 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA224 checksum", RESET(), "\t;  $0 -3 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-4 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA256 checksum", RESET(), "\t;  $0 -4 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-5 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA384 checksum", RESET(), "\t;  $0 -5 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-6 ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> SHA512 checksum", RESET(), "\t;  $0 -6 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-m ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> " . BOLD(), "m", RESET(), "d5 digest", RESET(), "\t\t;  $0 -m \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-e ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> int -> hex (n" . BOLD(), "e", RESET(), "twork-byte order)", RESET(), "\t;  $0 -e 4444\n";
-        print BOLD(), BLUE(), "\t-E ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t", RESET(), "=> hex (n" . BOLD(), "E", RESET(), "twork-byte order) ->  int", RESET(), "\t;  $0 -E 5c11\n";
+	print BOLD(), BLUE(), "\t-U ", RESET(), BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "U", RESET(), "RL encode", RESET(), "\t\t;  $0 -U \"hello world\"\n";
+	print BOLD(), BLUE(), "\t-u ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "u", RESET(), "RL decode", RESET(), "\t\t;  $0 -u \"hello%20world\"\n";
+	print BOLD(), BLUE(), "\t-B ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "B", RESET(), "ase64 encode", RESET(), "\t;  $0 -B \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-b ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "b", RESET(), "ase64 decode", RESET(), "\t;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
+        print BOLD(), BLUE(), "\t-H ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "H", RESET(), "TML encode", RESET(), "\t\t;  $0 -H \"<hello world>\"\n";
+        print BOLD(), BLUE(), "\t-h ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "h", RESET(), "TML decode", RESET(), "\t\t;  $0 -h \"&lt;hello world&gt;\"\n";
+        print BOLD(), BLUE(), "\t-X ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ascii ->  he", BOLD(), "X", RESET(), "\t;  $0 -X \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-x ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> he", BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t;  $0 -x \"68656c6c6f20776f72664\"\n";
+        print BOLD(), BLUE(), "\t-I ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "I", RESET(), "nt   ->  hex", RESET(), "\t;  $0 -I \"10\"\n";
+        print BOLD(), BLUE(), "\t-i ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  ", BOLD(), "i", RESET(), "nt", RESET(), "\t;  $0 -i \"0xa\"\n";
+        print BOLD(), BLUE(), "\t-n ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> -i", BOLD(), "n", RESET(), "t  ->  hex", RESET(), "\t;  $0 -n -- -77\n";
+        print BOLD(), BLUE(), "\t-N ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> -hex  ->  i", BOLD(), "N", RESET(), "t", RESET(), "\t;  $0 -N 0xffffffb3\n";
+        print BOLD(), BLUE(), "\t-T ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> in", BOLD(), "T", RESET(), "   ->  bin", RESET(), "\t;  $0 -T 30\n";
+        print BOLD(), BLUE(), "\t-t ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> bin   ->  in", BOLD(), "t", RESET(), "\t;  $0 -t 1010\n";
+        print BOLD(), BLUE(), "\t-F ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "F", RESET(), "loat ->  hex", RESET(), "\t;  $0 -F 3.33\n";
+        print BOLD(), BLUE(), "\t-l ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  f", BOLD(), "l", RESET(), "oat", RESET(), "\t;  $0 -l 0x40551ed8\n";
+        print BOLD(), BLUE(), "\t-o ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "o", RESET(), "ctal ->  hex", RESET(), "\t;  $0 -o 35\n";
+        print BOLD(), BLUE(), "\t-O ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  ", BOLD(), "O", RESET(), "ctal", RESET(), "\t;  $0 -O 0x12\n";
+        print BOLD(), BLUE(), "\t-0 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> bin   -> ", BOLD(), "", RESET(), " hex", RESET(), "\t;  $0 -0 1100011\n";
+        print BOLD(), BLUE(), "\t-1 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   -> ", BOLD(), "", RESET(), " bin", RESET(), "\t;  $0 -1 0x63\n";
+        print BOLD(), BLUE(), "\t-2 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA1 checksum", RESET(), "\t;  $0 -2 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-3 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA224 checksum", RESET(), "\t;  $0 -3 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-4 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA256 checksum", RESET(), "\t;  $0 -4 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-5 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA384 checksum", RESET(), "\t;  $0 -5 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-6 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA512 checksum", RESET(), "\t;  $0 -6 \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-m ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "m", RESET(), "d5 digest", RESET(), "\t\t;  $0 -m \"hello world\"\n";
+        print BOLD(), BLUE(), "\t-e ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> int -> hex (n", BOLD(), "e", RESET(), "twork-byte order)", RESET(), "\t;  $0 -e 4444\n";
+        print BOLD(), BLUE(), "\t-E ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex (n", BOLD(), "E", RESET(), "twork-byte order) ->  int", RESET(), "\t;  $0 -E 5c11\n";
         print "\n";
-        print BOLD(), BLUE(), "\t-s ", RESET(), BOLD(), "" . BOLD(), BLUE(), "\t\t", RESET(), "=> " . BOLD(), "s", RESET(), "uppress (display result ", RESET(), BOLD(), "only", RESET(), ")\n", RESET();
-        print BOLD(), BLUE(), "\t-f <", RESET(), BOLD(), "filename" . BOLD(), BLUE(), ">\t", RESET(), "=> use a file as input, instead of a string on the command-line\n", RESET();
+        print BOLD(), BLUE(), "\t-s ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t\t", RESET(), "=> ", BOLD(), "s", RESET(), "uppress (display result ", RESET(), BOLD(), "only", RESET(), ")\n", RESET();
+        print BOLD(), BLUE(), "\t-f <", RESET(), BOLD(), "filename", BOLD(), BLUE(), ">\t", RESET(), "=> use a file as input, instead of a string on the command-line\n", RESET();
         print BOLD(), BLUE(), "\t--help\t\t", RESET(), "=> displays help\n";
         print BOLD(), BLUE(), "\t--version\t", RESET(), "=> displays version information\n";
         print "\n";
-        print "\t\tEXAMPLES:  " . BOLD(), BLUE(), "$0 -b -s \"aGVsbG8gd29ybGQ=\"\n", RESET();
-        print "\t\t           " . BOLD(), BLUE(), "$0 -X -f /var/www/meterpreter.php\n", RESET();
+        print "\t\tEXAMPLES:  ", BOLD(), BLUE(), "$0 -b -s \"aGVsbG8gd29ybGQ=\"\n", RESET();
+        print "\t\t           ", BOLD(), BLUE(), "$0 -X -f /var/www/meterpreter.php\n", RESET();
 	exit 0;
 }
 
 ## default config values
 my %opts = (
-	    config => '',
 	    color => 1,
+	    file => '',
 	   );
 
 Getopt::Long::Configure("no_ignore_case");
@@ -125,24 +123,22 @@ GetOptions(\%opts,
    'suppress|s'	=> \$opts{suppress},
    'file|f=s'	=> \@file,
    'color!'	=> \$opts{color},
-   'help'	=> sub { HELP_MESSAGE(); },
-   'man' 	=> sub { pod2usage( { -verbose=>2 } ); exit; },
-   'version' 	=> sub { VERSION_MESSAGE(); exit(0); },
+   'help'	=> \$opts{help},
+   'man'	=> \$opts{man},
+   'version' 	=> \$opts{version},
 );
+   #'man' 	=> sub { $opts{man} = 1; podtextcolor(); },
+#   'man' 	=> sub { pod2usage( { -verbose=>2 } ); exit; },
    #'man' 	=> sub { pod2usage( { -verbose=>2, -input => \*DATA } ); exit; },
 
 ## user may want to disable color
-if ($HAS_COLOR and not $opts{color})
-{
+if ($HAS_COLOR and not $opts{color}) {
     $HAS_COLOR = 0;
 }
 
-if ($HAS_COLOR)
-{
+if ($HAS_COLOR) {
     import Term::ANSIColor ':constants';
-}
-else
-{
+} else {
     *RESET  = sub { };
     *YELLOW = sub { };
     *CYAN   = sub { };
@@ -162,7 +158,18 @@ my $BLUE   = BLUE()    || '';
 my $WHITE  = WHITE()   || '';
 my $BOLD   = BOLD()    || '';
 
-if ( ! $ARGV[0] && ! @file ) {
+if (($opts{man})) {
+	podtextcolor();
+	exit(0);
+} elsif (($opts{version})) {
+	VERSION_MESSAGE();
+	exit(0);
+} elsif (($opts{help})) {
+	HELP_MESSAGE();
+	exit(0);
+} elsif ( ! $ARGV[0] && ! @file ) {
+#} elsif ( ! $ARGV[0] && ! @file || ! $opts{man} || ! $opts{version} || ! $opts{help} ) {
+#if ( ! $ARGV[0] && ! @file || ! $opts{man} ) {
         HELP_MESSAGE();
         exit(0);
 };
@@ -188,7 +195,7 @@ if (@file) {
 			htmlfile() 	if $opts{html};
 			HEXfile() 	if $opts{HEX};
 			xfile() 	if $opts{hex};
-			INTfile() 	if $opts{INT};   # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
+			INTfile() 	if $opts{INT};     # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
 			ifile() 	if $opts{int};     # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
 			INTBfile() 	if $opts{INTB};
 			bintfile() 	if $opts{bint};
@@ -197,7 +204,7 @@ if (@file) {
 			octhfile() 	if $opts{octh};
 			HOCTfile() 	if $opts{HOCT};
 			nintfile() 	if $opts{nint};
-			NHEXfile() 	if $opts{NHEX}; #  ./hURL -n -- -77
+			NHEXfile() 	if $opts{NHEX};    #  ./hURL -n -- -77
 			netfile() 	if $opts{net};
 			NETfile() 	if $opts{NET};
 			binhfile() 	if $opts{binh};
@@ -224,7 +231,7 @@ HTML() 		if $opts{HTML};
 html() 		if $opts{html};
 HEX() 		if $opts{HEX};
 x() 		if $opts{hex};
-INT() 		if $opts{INT};   # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
+INT() 		if $opts{INT};     # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
 i() 		if $opts{int};     # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
 INTB() 		if $opts{INTB};
 bint() 		if $opts{bint};
@@ -233,7 +240,7 @@ hfloat() 	if $opts{hfloat};
 octh() 		if $opts{octh};
 HOCT() 		if $opts{HOCT};
 nint() 		if $opts{nint};
-NHEX() 		if $opts{NHEX}; #  ./hURL -n -- -77
+NHEX() 		if $opts{NHEX};    #  ./hURL -n -- -77
 net() 		if $opts{net};
 NET() 		if $opts{NET};
 binh() 		if $opts{binh};
@@ -245,6 +252,22 @@ sha384() 	if $opts{SHA384};
 sha512() 	if $opts{SHA512};
 md5() 		if $opts{md5};
 string2stack() 	if $opts{stack};
+#podtextcolor()	if $opts{man};
+
+sub podtextcolor {
+        if ($HAS_COLOR) {
+                use Pod::Text::Color;
+                $parser = new Pod::Text::Color(
+                    width => 78,
+                    sentence => 1,
+                );
+                $parser->parse_from_filehandle(\*DATA);
+                exit(0);
+        } else {
+                pod2usage( { -verbose=>2, -input => \*DATA } );
+                exit(0);
+        }
+}
 
 sub URL {
         if (($opts{suppress}) && ($ARGV[0])) {
@@ -923,7 +946,6 @@ sub string2stackfile {
         }
 }
 
-
 sub str2stk ($) {
 		if ($file) {
 			$strToPush=$string;
@@ -938,7 +960,7 @@ sub str2stk ($) {
 		$strOpcodes="";
 		$strPush="";
 		$hexWord="";
-		print BOLD(), BLUE(), "\nString length :: " . RESET(), BOLD(), length($strToPush)."\n", RESET();
+		print BOLD(), BLUE(), "\nString length :: ", RESET(), BOLD(), length($strToPush), "\n", RESET();
 		print BOLD(), CYAN(), "Opcodes to push this string onto the stack + terminating NULL BYTE (\\x00) ::\n\n", RESET();
 		while ($cnt < length($strToPush))
 		{
@@ -1063,9 +1085,6 @@ sub hex2ascii ($)
    return $str;
 }
 
-#my $FOOBAR = print BOLD(), BLUE "Text\n";
-
-
 __DATA__
 =head1 NAME
 
@@ -1073,9 +1092,10 @@ __DATA__
 
 =head1 SYNOPSIS
 
-  hURL [U|u|B|b|H|h|X|x|I|i|n|N|T|t|F|l|o|O|0|1|2|3|4|5|6|m|e|E] [-s] [string|-f <filename>]
+  hURL [-options|--options] [string|-f <filename>]
 
 =head1 ARGUMENTS
+
 
   ARGZ  
 	E<number>	 ASCII character code
@@ -1118,10 +1138,38 @@ C<red>shabba123
 
 
 	* FILES get processed before $ARGV[0] no matter what
-		-U "ii ii" -f ii -f i
-		-U -f ii -f i "ii ii"
-	* MULTIPLE files can be used on the command-line
-		-f <file> -f <file>
+		-U "hello world" -f <file1> -f <file2>
+		-U -f <file1> -f <file2> "hello world"
+	* MULTIPLE files can be specified on the command-line (-f+ or using ,)
+		-f <file1> -f <file2>
+		-f <file1>,<file2>,<file3>
+
+	>>> rasc -h
+	Usage: rasc [-cCexXtLV] [-l port] [-a addr@off] [-[A|N|C|E] N]
+	            [-s hexpair] [-i name] [-S file] [-h]
+	  -l [port]    starts a syscall proxy server
+	  -A [n]       prefix shellcode with N A's (0x41)
+	  -N [n]       prefix shellcode with N nops (0x90)
+	  -C [n]       suffix shellcode with N traps
+	  -E [n]       prefix with enumeration 01 02 03..
+	  -a addr@off  set the return address at a specified offset
+	  -s 'sc'      set shellcode in hexpairs (cc cd 80)
+	  -S 'file'    load shellcode from file
+	  -i 'scdb'    hardcoded shellcode (-L to list)
+	  -L           list hardcoded shellcodes
+	  -c           output in C format
+	  -e           output in escapped string
+	  -x           output in hexpairs format
+	  -X           execute shellcode
+	  -t           test current platform
+	  -V           show version information
+	 Environment variables to compile shellcodes:
+	  CMD          Command to execute on execves
+	  HOST         Host to connect
+	  PORT         Port to listen or connect
+
+B<USE perltidy + perlcritic> (--brutal --theme=pbp)
+	       /usr/bin/vendor_perl/perlcritic --brutal --theme=pbp hURL-getoptlong
 
 =head1 DESCRIPTION
 
@@ -1155,46 +1203,48 @@ This is a paragraph that will appear in documents produced by the pod2text forma
 </font>
 
 	COMMAND LINE ARGUMENTS
-	-U 	=> URL encode		;  ./hURL -U "hello world"
-	-u 	=> uRL decode		;  ./hURL -u "hello%20world"
-	-B 	=> Base64 encode	;  ./hURL -B "hello world"
-	-b 	=> base64 decode	;  ./hURL -b "aGVsbG8gd29ybGQ="
-	-H 	=> HTML encode		;  ./hURL -H "<hello world>"
-	-h 	=> hTML decode		;  ./hURL -h "&lt;hello world&gt;"
-	-X 	=> ascii ->  heX	;  ./hURL -X "hello world"
-	-x 	=> hex   ->  ascii	;  ./hURL -x "68656c6c6f20776f726c64"
-	-I 	=> Int   ->  hex	;  ./hURL -I "10"
-	-i 	=> hex   ->  int	;  ./hURL -i "0xa"
-	-n 	=> -int  ->  hex	;  ./hURL -n -- -77
-	-N 	=> -hex  ->  iNt	;  ./hURL -N 0xffffffb3
-	-T 	=> inT   ->  bin	;  ./hURL -T 30
-	-t 	=> bin   ->  int	;  ./hURL -t 1010
-	-F 	=> Float ->  hex	;  ./hURL -F 3.33
-	-l 	=> hex   ->  float	;  ./hURL -l 0x40551ed8
-	-o 	=> octal ->  hex	;  ./hURL -o 35
-	-O 	=> hex   ->  Octal	;  ./hURL -O 0x12
-	-0 	=> bin   ->  hex	;  ./hURL -0 1100011
-	-1 	=> hex   ->  bin	;  ./hURL -1 0x63
-	-2 	=> SHA1 checksum	;  ./hURL -2 "hello world"
-	-3 	=> SHA224 checksum	;  ./hURL -3 "hello world"
-	-4 	=> SHA256 checksum	;  ./hURL -4 "hello world"
-	-5 	=> SHA384 checksum	;  ./hURL -5 "hello world"
-	-6 	=> SHA512 checksum	;  ./hURL -6 "hello world"
-	-m 	=> md5 digest		;  ./hURL -m "hello world"
-	-e 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
-	-E 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
+	-U|--URL 	=> URL encode				;  ./hURL -U "hello world"
+	-u|--url 	=> uRL decode				;  ./hURL -u "hello%20world"
+	-B|--BASE64 	=> Base64 encode			;  ./hURL -B "hello world"
+	-b|--base64 	=> base64 decode			;  ./hURL -b "aGVsbG8gd29ybGQ="
+	-H|--HTML	=> HTML encode				;  ./hURL -H "<hello world>"
+	-h|--html 	=> hTML decode				;  ./hURL -h "&lt;hello world&gt;"
+	-X|--HEX 	=> ascii ->  heX			;  ./hURL -X "hello world"
+	-x|--hex 	=> hex   ->  ascii			;  ./hURL -x "68656c6c6f20776f726c64"
+	-I|--INT 	=> Int   ->  hex			;  ./hURL -I "10"
+	-i|--int 	=> hex   ->  int			;  ./hURL -i "0xa"
+	-n|--nint 	=> -int  ->  hex			;  ./hURL -n -- -77
+	-N|--NHEX 	=> -hex  ->  iNt			;  ./hURL -N 0xffffffb3
+	-T|--INTB 	=> inT   ->  bin			;  ./hURL -T 30
+	-t|--bint 	=> bin   ->  int			;  ./hURL -t 1010
+	-F|--FLOATH 	=> Float ->  hex			;  ./hURL -F 3.33
+	-l|--hfloat 	=> hex   ->  float			;  ./hURL -l 0x40551ed8
+	-o|--octh 	=> octal ->  hex			;  ./hURL -o 35
+	-O|--HOCT 	=> hex   ->  Octal			;  ./hURL -O 0x12
+	-0|--binh 	=> bin   ->  hex			;  ./hURL -0 1100011
+	-1|--hexb 	=> hex   ->  bin			;  ./hURL -1 0x63
+	-2|--SHA1 	=> SHA1 checksum			;  ./hURL -2 "hello world"
+	-3|--SHA224 	=> SHA224 checksum			;  ./hURL -3 "hello world"
+	-4|--SHA256 	=> SHA256 checksum			;  ./hURL -4 "hello world"
+	-5|--SHA384 	=> SHA384 checksum			;  ./hURL -5 "hello world"
+	-6|--SHA512 	=> SHA512 checksum			;  ./hURL -6 "hello world"
+	-7|--stack	=> push string 2 stack (corelanc0d3r)	;  ./hURL -7 "hello world"
+	     --esc  :: output in escaped string	{default}	;  "\x00\x01\x02\x03\x04\x05 ..."
+	     --pair :: output in hexpairs format		;  000102030405060708090a0b0c0d0e0f ...
+	     --C    :: output in C format			;  unsigned char shellcode[] = { 0x00, 0x01, 0x02, ... 0x0b, };
+	-m|--md5 	=> md5 digest				;  ./hURL -m "hello world"
+	-e|--net 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
+	-E|--NET 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
 
-	-s 		=> suppress (display result only)
-	-f <filename>	=> use a file as input, instead of a string on the command-line
-	--help		=> displays help
-	--version	=> displays version information
+	-s|--suppress			=> suppress (display result only)
+	-f|--file <file1>,<file2>	=> use a file as input, instead of a string on the command-line
+	--color|--nocolor		=> enable/disable colored output [default is ENABLED]
+	--help				=> displays help
+	--man				=> displays extended help
+	--version			=> displays version information
 
 		EXAMPLES:  ./hURL -b -s "aGVsbG8gd29ybGQ="
 		           ./hURL -X -f /var/www/meterpreter.php
-
-
-    -h  --help              Display this help
-    -H  --man               Display detailed help (examples)
 
 =head1 AUTHOR
 
