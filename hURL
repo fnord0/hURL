@@ -10,7 +10,8 @@
 # 05202012 => --man option for extended documentation done using Pod::Usage
 # 05202012 => color|nocolor optional support added
 # 05212012 => multi-file support (-f <file1>,<file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
-# 05272012 => ROT13 encode + decode
+# 05272012 => rotate13/ROT13 encode + decode
+# 06022012 => sting2stack output formats added: ansiC format, escaped string, hexpairs format
 
 ## /home/fnord0/h4x/shellcode/ <- good scripts, check em for ideas
 ## shellcodeexec ? 
@@ -19,8 +20,8 @@
 # copyleft - fnord0@riseup.net
 
 use strict;
-use warnings;
-use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $rot13 $parser/;
+#use warnings;
+use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $strDelimit $strHexy $rot13 $parser/;
 $|++;
 use Getopt::Long qw(:config bundling no_ignore_case);
 use Pod::Usage;
@@ -127,6 +128,9 @@ GetOptions(\%opts,
    'stack|9'	=> \$opts{stack},
    'net|e'	=> \$opts{net},
    'NET|E'	=> \$opts{NET},
+   'ansiC'      => \$opts{ansiC},
+   'pair'     	=> \$opts{pair},
+   'esc'      	=> \$opts{esc},
    'suppress|s'	=> \$opts{suppress},
    'file|f=s'	=> \@file,
    'color!'	=> \$opts{color},
@@ -221,8 +225,8 @@ if (@file) {
 			sha256file() 	if $opts{SHA256};
 			sha384file() 	if $opts{SHA384};
 			sha512file() 	if $opts{SHA512};
-			rot13file()	if $opts{ROT13};
-			unrot13file()	if $opts{rot13};
+			rotate13file()	if $opts{ROT13};
+			unrotate13file()	if $opts{rot13};
 			md5file() 	if $opts{md5};
 			string2stackfile() if $opts{stack};
         	}
@@ -259,8 +263,8 @@ sha224() 	if $opts{SHA224};
 sha256() 	if $opts{SHA256};
 sha384() 	if $opts{SHA384};
 sha512() 	if $opts{SHA512};
-rot13() 	if $opts{ROT13};
-unrot13() 	if $opts{rot13};
+rotate13() 	if $opts{ROT13};
+unrotate13() 	if $opts{rot13};
 md5() 		if $opts{md5};
 string2stack() 	if $opts{stack};
 #podtextcolor()	if $opts{man};
@@ -939,7 +943,7 @@ sub hexbfile {
         }
 }
 
-sub rot13 {
+sub rotate13 {
         if (($opts{suppress}) && ($ARGV[0])) {
                 $string = $ARGV[0];
 		$string =~ tr[a-zA-Z][n-za-mN-ZA-M];
@@ -952,7 +956,7 @@ sub rot13 {
         }
 }
 
-sub rot13file {
+sub rotate13file {
 	if (($opts{suppress}) && ($file)) {
 		$string =~ tr[a-zA-Z][n-za-mN-ZA-M];
                 print BOLD(), $string, RESET();
@@ -963,7 +967,7 @@ sub rot13file {
 	}
 }
 
-sub unrot13 {
+sub unrotate13 {
         if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
 		$string =~ tr[n-za-mN-ZA-M][a-zA-Z];
@@ -977,7 +981,7 @@ sub unrot13 {
 	
 }
 
-sub unrot13file {
+sub unrotate13file {
         if (($opts{suppress}) && ($file)) {
                 $string =~ tr[n-za-mN-ZA-M][a-zA-Z];
                 print BOLD(), "$string", RESET();
@@ -1022,52 +1026,160 @@ sub str2stk ($) {
 		$hexWord="";
 		print BOLD(), BLUE(), "\nString length :: ", RESET(), BOLD(), length($strToPush), "\n", RESET();
 		print BOLD(), CYAN(), "Opcodes to push this string onto the stack + terminating NULL BYTE (\\x00) ::\n\n", RESET();
-		while ($cnt < length($strToPush))
-		{
-		  $strThisChar=substr($strToPush,$cnt,1);
-		  $strThisHex="\\x".ascii_to_hex($strThisChar);
-		  if ($bytecnt < 3)
-		  {
-		     $strHex=$strHex.$strThisHex;
-		         $bytecnt=$bytecnt+1;
-		  }
-		  else
-		  {
-		    $strPush = $strHex.$strThisHex;
-		    $strPush =~ tr/\\x//d;
-  		    $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+                if (($opts{ansiC})) {
+			print BOLD(), "unsigned char shellcode[] = {\n", RESET();
+                        $strHexy = "0x";
+                        $strDelimit = ",";
+                        while ($cnt < length($strToPush))
+                        {
+                          $strThisChar=substr($strToPush,$cnt,1);
+			  $strThisHex=" 0x".ascii_to_hex($strThisChar).$strDelimit;
+                          if ($bytecnt < 3)
+                          {
+                             $strHex=$strHex.$strThisHex;
+                                 $bytecnt++;
+                          }
+                          else
+                          {
+                            $strPush = $strHex.$strThisHex;
+				$strPush =~ s/0x//g;
+				$strPush =~ tr/([0-9A-Fa-f]{2})+//cd;
 
-		    $strHex=chr(34)."\\x68".$strHex.$strThisHex.chr(34).
-		        "    //PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
-		        substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+                            $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
 
-		    $strOpcodes=$strHex."\n".$strOpcodes;
-		    $strHex="";
-		        $bytecnt=0;
-		  }
-		  $cnt=$cnt+1;
-		}
-		#last line
-		if (length($strHex) > 0)
-		{
-		  while(length($strHex) < 12)
-		  {
-		    $strHex=$strHex."\\x20";
-		  }
-		  $strPush = $strHex;
-		  $strPush =~ tr/\\x//d;
-                  $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+			    $strHex="  0x68,".$strHex.$strThisHex.
+               		            "    /* PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
+                       		    substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39) . " */";
 
-		  $strHex=chr(34)."\\x68".$strHex."\\x00".chr(34)."    //PUSH 0x00".
-		  substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
-		  $strOpcodes=$strHex."\n".$strOpcodes;
-		}
-		else
-		{
-		  #add line with spaces + null byte (string terminator)
-		  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20\\x00".chr(34)."    //PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
-		}
+                            $strOpcodes=$strHex."\n".$strOpcodes;
+                            $strHex="";
+                            $bytecnt=0;
+                          }
+                          $cnt++;
+                        }
+                        ##last line
+                        if (length($strHex) > 0)
+                        {
+                                while(length($strHex) < 18)
+                                {
+                                  $strHex=$strHex." 0x20,";
+                                }
+                                $strPush = $strHex;
+                                $strPush =~ s/0x//g;
+                                $strPush =~ tr/([0-9A-Fa-f]{2})+//cd;
+
+                                $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+				$strHex="  0x68,".$strHex." 0x00, "."   /* PUSH 0x00".
+                                substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39) . " */";
+                                $strOpcodes=$strHex."\n".$strOpcodes;
+                        }
+                        else
+                        {
+                          ##add line with spaces + null byte (string terminator)
+			$strOpcodes="  0x68, 0x20, 0x20, 0x20, 0x00, "."   /* PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\' */\n".$strOpcodes;
+                        }
+		print $strOpcodes . BOLD() . "};" . RESET();
+
+                } elsif (($opts{pair})) {
+                        $strHexy = '';
+                        $strDelimit = '';
+
+                        while ($cnt < length($strToPush))
+                        {
+                          $strThisChar=substr($strToPush,$cnt,1);
+                          $strThisHex=ascii_to_hex($strThisChar);
+                          if ($bytecnt < 3)
+                          {
+                             $strHex=$strHex.$strThisHex;
+                             $bytecnt++;
+                          }
+                          else
+                          {
+                            $strPush = $strHex.$strThisHex;
+                            $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+                           $strHex="68".$strHex.$strThisHex.
+                                    "    # PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
+                                    substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+
+                            $strOpcodes=$strHex."\n".$strOpcodes;
+                            $strHex="";
+                            $bytecnt=0;
+                          }
+                          $cnt++;
+                        }
+                        ##last line
+                        if (length($strHex) > 0)
+                        {
+                                while(length($strHex) < 6)
+                                {
+                                  $strHex=$strHex."20";
+                                }
+                                $strPush = $strHex;
+                                $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+                                $strHex="68".$strHex."00"."    # PUSH 0x00".
+                                substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+                                $strOpcodes=$strHex."\n".$strOpcodes;
+                        }
+                        else
+                        {
+                          #add line with spaces + null byte (string terminator)
+                        $strOpcodes="6820202000 "."   # PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+                        }
 		print $strOpcodes;
+
+                } else {
+                        $strHexy = "\\x";
+                        $strDelimit = '';
+	                while ($cnt < length($strToPush))
+	                {
+	                  $strThisChar=substr($strToPush,$cnt,1);
+	                  $strThisHex="\\x".ascii_to_hex($strThisChar);
+	                  if ($bytecnt < 3)
+	                  {
+	                     $strHex=$strHex.$strThisHex;
+	                         $bytecnt++;
+	                  }
+	                  else
+	                  {
+	                    $strPush = $strHex.$strThisHex;
+	                    $strPush =~ tr/\\x//d;
+	                    $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+	
+	                    $strHex=chr(34)."\\x68".$strHex.$strThisHex.chr(34).
+	                        "    //PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
+	                        substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+
+                    	    $strOpcodes=$strHex."\n".$strOpcodes;
+                   	    $strHex="";
+                            $bytecnt=0;
+                  	  }
+                	  $cnt++;
+                  	}
+                	##last line
+                	if (length($strHex) > 0)
+                	{
+                  		while(length($strHex) < 12)
+                  		{
+                  		  $strHex=$strHex."\\x20";
+                  		}
+                  		$strPush = $strHex;
+                  		$strPush =~ tr/\\x//d;
+                  		$hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+
+                  		$strHex=chr(34)."\\x68".$strHex."\\x00".chr(34)."    //PUSH 0x00".
+                  		substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+                  		$strOpcodes=$strHex."\n".$strOpcodes;
+               		}
+                	else
+                	{
+               		  ##add line with spaces + null byte (string terminator)
+                  	  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20\\x00".chr(34)."    //PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+                	}
+		print $strOpcodes;
+		}
 }
 
 sub str2stksuppress ($) {
@@ -1084,52 +1196,141 @@ sub str2stksuppress ($) {
 		$strOpcodes="";
 		$strPush="";
 		$hexWord="";
-		while ($cnt < length($strToPush))
-		{
-		  $strThisChar=substr($strToPush,$cnt,1);
-		  $strThisHex="\\x".ascii_to_hex($strThisChar);
-		  if ($bytecnt < 3)
-		  {
-		     $strHex=$strHex.$strThisHex;
-		         $bytecnt=$bytecnt+1;
-		  }
-		  else
-		  {
-		    $strPush = $strHex.$strThisHex;
-		    $strPush =~ tr/\\x//d;
-  		    $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
 
-		    $strHex=chr(34)."\\x68".$strHex.$strThisHex.chr(34).
-		        "    //PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
-		        substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
+                if (($opts{ansiC})) {
+			print BOLD(), "unsigned char shellcode[] = {\n", RESET();
+                        $strHexy = "0x";
+                        $strDelimit = ",";
+                        while ($cnt < length($strToPush))
+                        {
+                          $strThisChar=substr($strToPush,$cnt,1);
+			  $strThisHex=" 0x".ascii_to_hex($strThisChar).$strDelimit;
+                          if ($bytecnt < 3)
+                          {
+                             $strHex=$strHex.$strThisHex;
+                             $bytecnt++;
+                          }
+                          else
+                          {
+                            $strPush = $strHex.$strThisHex;
+				$strPush =~ s/0x//g;
+				$strPush =~ tr/([0-9A-Fa-f]{2})+//cd;
 
-		    $strOpcodes=$strHex."\n".$strOpcodes;
-		    $strHex="";
-		        $bytecnt=0;
-		  }
-		  $cnt=$cnt+1;
-		}
-		#last line
-		if (length($strHex) > 0)
-		{
-		  while(length($strHex) < 12)
-		  {
-		    $strHex=$strHex."\\x20";
-		  }
-		  $strPush = $strHex;
-		  $strPush =~ tr/\\x//d;
-                  $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
+			    $strHex="  0x68,".$strHex.$strThisHex;
 
-		  $strHex=chr(34)."\\x68".$strHex."\\x00".chr(34)."    //PUSH 0x00".
-		  substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
-		  $strOpcodes=$strHex."\n".$strOpcodes;
-		}
-		else
-		{
-		  #add line with spaces + null byte (string terminator)
-		  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20\\x00".chr(34)."    //PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
-		}
+                            $strOpcodes=$strHex."\n".$strOpcodes;
+                            $strHex="";
+                            $bytecnt=0;
+                          }
+                          $cnt++;
+                        }
+                        ##last line
+                        if (length($strHex) > 0)
+                        {
+                                while(length($strHex) < 18)
+                                {
+                                  $strHex=$strHex." 0x20,";
+                                }
+                                $strPush = $strHex;
+                                $strPush =~ s/0x//g;
+                                $strPush =~ tr/([0-9A-Fa-f]{2})+//cd;
+
+				$strHex="  0x68,".$strHex." 0x00, ";
+                                $strOpcodes=$strHex."\n".$strOpcodes;
+                        }
+                        else
+                        {
+                          ##add line with spaces + null byte (string terminator)
+			$strOpcodes="  0x68, 0x20, 0x20, 0x20, 0x00, ".$strOpcodes;
+                        }
+		print $strOpcodes . BOLD() . "};" . RESET();
+
+                } elsif (($opts{pair})) {
+                        $strHexy = '';
+                        $strDelimit = '';
+
+                        while ($cnt < length($strToPush))
+                        {
+                          $strThisChar=substr($strToPush,$cnt,1);
+                          $strThisHex=ascii_to_hex($strThisChar);
+                          if ($bytecnt < 3)
+                          {
+                             $strHex=$strHex.$strThisHex;
+                                 $bytecnt++;
+                          }
+                          else
+                          {
+                            $strPush = $strHex.$strThisHex;
+                           $strHex="68".$strHex.$strThisHex;
+                            $strOpcodes=$strHex.$strOpcodes;
+                            $strHex="";
+                            $bytecnt=0;
+                          }
+                          $cnt++;
+                        }
+                        ##last line
+                        if (length($strHex) > 0)
+                        {
+                                while(length($strHex) < 6)
+                                {
+                                  $strHex=$strHex."20";
+                                }
+                                $strPush = $strHex;
+                                $strHex="68".$strHex."00";
+                                $strOpcodes=$strHex.$strOpcodes;
+                        }
+                        else
+                        {
+                          #add line with spaces + null byte (string terminator)
+                        $strOpcodes="6820202000 ".$strOpcodes;
+                        }
 		print $strOpcodes;
+
+                } else {
+                        $strHexy = "\\x";
+                        $strDelimit = '';
+			print chr(34);
+
+	                while ($cnt < length($strToPush))
+	                {
+	                  $strThisChar=substr($strToPush,$cnt,1);
+	                  $strThisHex="\\x".ascii_to_hex($strThisChar);
+	                  if ($bytecnt < 3)
+	                  {
+	                     $strHex=$strHex.$strThisHex;
+	                         $bytecnt++;
+	                  }
+	                  else
+	                  {
+	                    $strPush = $strHex.$strThisHex;
+	                    $strPush =~ tr/\\x//d;
+	                    $strHex="\\x68".$strHex.$strThisHex;
+                    	    $strOpcodes=$strHex.$strOpcodes;
+                   	    $strHex="";
+                            $bytecnt=0;
+                  	  }
+                	  $cnt++;
+                  	}
+                	##last line
+                	if (length($strHex) > 0)
+                	{
+                  		while(length($strHex) < 12)
+                  		{
+                  		  $strHex=$strHex."\\x20";
+                  		}
+                  		$strPush = $strHex;
+                  		$strPush =~ tr/\\x//d;
+		                $strHex="\\x68".$strHex."\\x00";
+                  		$strOpcodes=$strHex.$strOpcodes;
+               		}
+                	else
+                	{
+               		        #add line with spaces + null byte (string terminator)
+                 		$strOpcodes="\\x68\\x20\\x20\\x20\\x00".$strOpcodes;
+			}
+		print $strOpcodes;
+		print chr(34);
+		}
 }
 
 sub ascii_to_hex ($)    
@@ -1154,6 +1355,8 @@ __DATA__
 
   hURL [-options|--options] [string|-f <filename>]
 
+F
+F
 =head1 ARGUMENTS
 
 
@@ -1227,6 +1430,33 @@ C<red>shabba123
 	  CMD          Command to execute on execves
 	  HOST         Host to connect
 	  PORT         Port to listen or connect
+
+
+	>>> rasc2 -h
+	Usage: rax2 [options] [expression]
+	  int   ->  hex           ;  rax2 10
+	  hex   ->  int           ;  rax2 0xa
+	  -int  ->  hex           ;  rax2 -77
+	  -hex  ->  int           ;  rax2 0xffffffb3
+	  int   ->  bin           ;  rax2 b30
+	  bin   ->  int           ;  rax2 1010d
+	  float ->  hex           ;  rax2 3.33f
+	  hex   ->  float         ;  rax2 Fx40551ed8
+	  oct   ->  hex           ;  rax2 35o
+	  hex   ->  oct           ;  rax2 Ox12 (O is a letter)
+	  bin   ->  hex           ;  rax2 1100011b
+	  hex   ->  bin           ;  rax2 Bx63
+	  raw   ->  hex           ;  rax2 -S < /binfile
+	  hex   ->  raw           ;  rax2 -s 414141
+	  -e    swap endianness   ;  rax2 -e 0x33
+	  -f    floating point    ;  rax2 -f 6.3+2.1
+	  -b    binstr -> bin     ;  rax2 -b 01000101 01110110
+	  -s    hexstr -> raw     ;  rax2 -s 43 4a 50
+	  -S    raw -> hexstr     ;  rax2 -S C  J  P
+	  -v    version           ;  rax2 -V
+	  -x    hash string       ;  rax2 -x linux osx
+	  -k    keep base         ;  rax2 -k 33+3 -> 36
+	  -h    help              ;  rax2 -h
 
 
 >>> awmtt
@@ -1327,9 +1557,9 @@ I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]>
 	-7|--ROT13	=> ROT13 encode				;  ./hURL -7 "hello world"
 	-8|--rot13	=> ROT13 decode				;  ./hURL -8 "uryyb jbeyq"
 	-9|--stack	=> push string 2 stack (corelanc0d3r)	;  ./hURL -9 "hello world"
-	     --esc  :: output in escaped string	{default}	;  "\x00\x01\x02\x03\x04\x05 ..."
-	     --pair :: output in hexpairs format		;  000102030405060708090a0b0c0d0e0f ...
-	     --C    :: output in C format			;  unsigned char shellcode[] = { 0x00, 0x01, 0x02, ... 0x0b, };
+	     --esc   :: output in escaped string  {default}		;  "\x68\x00\x01\x02\x03\x04\x05 ..."
+	     --pair  :: output in hexpairs format			;  68000102030405060708090a0b0c0d0e0f ...
+	     --ansiC :: output in C format				;  unsigned char shellcode[] = { 0x68, 0x00, 0x01, 0x02, ... 0x0f, };
 	-m|--md5 	=> md5 digest				;  ./hURL -m "hello world"
 	-e|--net 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
 	-E|--NET 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
@@ -1339,7 +1569,7 @@ I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]>
 	--man				=> displays extended help
 	--version			=> displays version information
 
-	-f|--file <file1>,<file2>	=> use (a) file(s) as input
+	-f|--file <file1>,<file2>	=> use file(s) as input
 	[string]			=> string as input
 
 =head1 AUTHOR
@@ -1356,12 +1586,16 @@ F<./hURL -b -s "aGVsbG8gd29ybGQ=">
 
 F<./hURL -X -f /var/www/meterpreter.php>
 
-=head2 Third Example :: Multiple files as input
+=head2 Third Example :: Multiple files as input (files are read in as RAW, so binary files can be used as input)
 
 F<./hURL -Xf <file1E<gt>,<file2E<gt>,<file3E<gt>>
 
 =head2 Forth Example :: Multiple files as input + string on command line {files WILL BE TRANSFORMED BEFORE THE STRING} + multiple flag manipulators
 
 F<./hURL -23456s -f <file1E<gt>,<file2E<gt> "hello wolrd">
+
+=head2 Fifth Example :: Binary files are read RAW and can be used as input, here we will convert Binary exe file to hexadecimal
+
+F<./hURL -X -f /pentest/windows-binaries/tools/nc.exe>
 
 
