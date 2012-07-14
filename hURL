@@ -1,27 +1,36 @@
 #!/usr/bin/perl
-# hURL - hexadecimal & URL encoder + decoder  v2.0
-# 06152011 => added md5 digest (hex 32byte)
-# 06162011 => added base64 encode + decode
-# 06162011 => added HTML encode + decode
-# 06172011 => added "-s" supress (minimal mode). combine with other tools (i.e. msfvenom)
-# 04242012 => SHA1/224/256/384/512 + MORE, script becomes similar in vein to radare's rax(2) base conversion tool
-# 05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: http://corelan.be|pvePushString.pl)
-# 05202012 => Getopt::Long for better command-line support
-# 05202012 => --man option for extended documentation done using Pod::Usage
-# 05202012 => color|nocolor optional support added
-# 05212012 => multi-file support (-f <file1>,<file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
-# 05272012 => rotate13/ROT13 encode + decode
-# 06022012 => sting2stack output formats added: ansiC format, escaped string, hexpairs format
-
-## /home/fnord0/h4x/shellcode/ <- good scripts, check em for ideas
-## shellcodeexec ? 
-## winexec > /usr/src/metasploit/external/source/shellcode/windows/msf2/win32_stage_winexec.asm
-#######################################################
+# hURL - hexadecimal & URL encoder + decoder  v2.1
 # copyleft - fnord0@riseup.net
+#
+# CHANGELOG
+#  06152011 => added md5 digest (hex 32byte)
+#  06162011 => added base64 encode + decode
+#  06162011 => added HTML encode + decode
+#  06172011 => added "-s" supress (minimal mode). combine with other tools (i.e. msfvenom)
+#  04242012 => SHA1/224/256/384/512 + MORE, script becomes similar in vein to radare's rax(2) base conversion tool
+#  05202012 => Peter Van Eeckhoutte/corelanc0d3r push string to stack function added (source: http://corelan.be|pvePushString.pl) - slight modifications
+#  05202012 => Getopt::Long for better command-line support
+#  05202012 => --man option for extended documentation done using Pod::Usage
+#  05202012 => color|nocolor optional support added
+#  05212012 => multi-file support (-f <file1>,<file2>)  +  bundling of multi-file && string on cmdline (-f <file1> -f <file2> "hello world")
+#  05272012 => rotate13/ROT13 encode + decode
+#  06022012 => sting2stack output formats added: ansiC format, escaped string, hexpairs format
+#  06022012 => ascii -> hex output formats added: escaped string, hexpairs
+#  06022012 => corelan reference added: adopted from https://redmine.corelan.be/projects/corelanart/
+#  07082012 => Peter Van Eeckhoutte/corelanc0der readbin function added (source: http://corelan.be|pveReadbin.pl) - slight modifications
+#  07082012 => Peter Van Eeckhoutte/corelanc0der inspired writebin function added (source: http://corelan.be|pveWritebin.pl)
+#  07082012 => added double URL encode + decode function
+#  07112012 => added a menu-driven interface, inspired by SET and WebSploit Toolkit
 
-use strict;
-#use warnings;
-use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $strDelimit $strHexy $rot13 $parser/;
+## TODO
+##  Unicode encoding
+##  Invalid Hex Encoding (ASP)
+##  unicode2ascii
+##  ascii2unicode
+##  detect being run on windows/linux
+#######################################################
+
+use vars qw/$myFile $myStringHex $myStringmd5 $myStringb64 $myStringb64d $myStringhe $myStringhd $int $fh @hexyLines @opt %opt %opts $string $urlenc $hex $hexi $bin $bini $bdone $floath $floathh $hexf $octh $hexo $hexb $binh $inth $inthh $integer $intn $hexdata $net $neth $sha1 $sha $sha2 $sha24 $sha3 $sha5 $sha224 $sha256 $sha384 $sha512 $opt $zeFile $file $line $color @file $strToPush $strThisChar $strThisHex $cnt $bytecnt $strHex $strOpcodes $strPush $hexWord $strDelimit $strHexy $rot13 $i $parser $select/;
 $|++;
 use Getopt::Long qw(:config bundling no_ignore_case);
 use Pod::Usage;
@@ -39,7 +48,6 @@ my $HAS_COLOR = $@ ? 0 : 1;
 my $VERSION = "v2.1";
 
 sub VERSION_MESSAGE {
-	#print BOLD(), RED(), "IrcMarkers $VERSION (C) 2003-2008 Christoph Berg <cb\@df7cb.de>, GNU GPL.\n", RESET();
 	print ".::[", RESET(), BOLD(), " hURL - hexadecimal & URL (en/de)coder ", RESET(), "]::.\n";
 	print RESET(), BOLD(), "$VERSION \@COPYLEFT  ->  fnord0 <at> riseup <dot> net\n", RESET();
 }
@@ -47,46 +55,65 @@ sub VERSION_MESSAGE {
 sub HELP_MESSAGE {
 	VERSION_MESSAGE();
 	print BOLD(), RED(), "\n  USAGE: ", RESET();
-	print BOLD(), BLUE(), "$0 ", BOLD(), BLUE(), "[", BOLD(), CYAN(), "U", BOLD(), BLUE(), "|", BOLD(), CYAN(), "u", BOLD(), BLUE(), "|", BOLD(), CYAN(), "B", BOLD(), BLUE(), "|", BOLD(), CYAN(), "b", BOLD(), BLUE(), "|", BOLD(), CYAN(), "H", BOLD(), BLUE(), "|", BOLD(), CYAN(), "h", BOLD(), BLUE(), "|", BOLD(), CYAN(), "X", BOLD(), BLUE(), "|", BOLD(), CYAN(), "x", BOLD(), BLUE(), "|", BOLD(), CYAN(), "I", BOLD(), BLUE(), "|", BOLD(), CYAN(), "i", BOLD(), BLUE(), "|", BOLD(), CYAN(), BOLD(), CYAN(), "n", BOLD(), BLUE(), "|", BOLD(), CYAN(), "N", BOLD(), BLUE(), "|", BOLD(), CYAN(), "T", BOLD(), BLUE(), "|", BOLD(), CYAN(), "t", BOLD(), BLUE(), "|", BOLD(), CYAN(), "F", BOLD(), BLUE(), "|", BOLD(), CYAN(), "l", BOLD(), BLUE(), "|", BOLD(), CYAN(), "o", BOLD(), BLUE(), "|", BOLD(), CYAN(), "O", BOLD(), BLUE(), "|", BOLD(), CYAN(), "0", BOLD(), BLUE(), "|", BOLD(), CYAN(), "1", BOLD(), BLUE(), "|", BOLD(), CYAN(), "2", BOLD(), BLUE(), "|", BOLD(), CYAN(), "3", BOLD(), BLUE(), "|", BOLD(), CYAN(), "4", BOLD(), BLUE(), "|", BOLD(), CYAN(), "5", BOLD(), BLUE(), "|", BOLD(), CYAN(), "6", BOLD(), BLUE(), "|", BOLD(), CYAN(), "m", BOLD(), BLUE(), "|", BOLD(), CYAN(), "e", BOLD(), BLUE(), "|", BOLD(), CYAN(), "E", BOLD(), BLUE(), "]", BOLD(), BLUE(), " [", BOLD(), CYAN(), "-s", BOLD(), BLUE(), "]", BOLD(), BLUE(), " [", BOLD(), CYAN(), "string", BOLD(), BLUE(), "|", BOLD(), CYAN(), "-f <filename>", BOLD(), BLUE(), "]\n", RESET();
+	print BOLD(), BLUE(), "$0 ", BOLD(), BLUE(), "[", BOLD(), CYAN(), " -flag", BOLD(), BLUE(), "|", BOLD(), CYAN(), "--flag ", BOLD(), BLUE(), "] [", BOLD(), CYAN(), " -f <file1>,<file2> ", BOLD(), BLUE(), "] [", BOLD(), CYAN(), " string ", BOLD(), BLUE(), "]\n", RESET();
 	print "\n";
-	print "\tCOMMAND LINE ARGUMENTS\n", RESET();
-	print BOLD(), BLUE(), "\t-U ", RESET(), BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "U", RESET(), "RL encode", RESET(), "\t\t;  $0 -U \"hello world\"\n";
-	print BOLD(), BLUE(), "\t-u ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "u", RESET(), "RL decode", RESET(), "\t\t;  $0 -u \"hello%20world\"\n";
-	print BOLD(), BLUE(), "\t-B ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "B", RESET(), "ase64 encode", RESET(), "\t;  $0 -B \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-b ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "b", RESET(), "ase64 decode", RESET(), "\t;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
-        print BOLD(), BLUE(), "\t-H ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "H", RESET(), "TML encode", RESET(), "\t\t;  $0 -H \"<hello world>\"\n";
-        print BOLD(), BLUE(), "\t-h ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "h", RESET(), "TML decode", RESET(), "\t\t;  $0 -h \"&lt;hello world&gt;\"\n";
-        print BOLD(), BLUE(), "\t-X ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ascii ->  he", BOLD(), "X", RESET(), "\t;  $0 -X \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-x ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> he", BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t;  $0 -x \"68656c6c6f20776f72664\"\n";
-        print BOLD(), BLUE(), "\t-I ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "I", RESET(), "nt   ->  hex", RESET(), "\t;  $0 -I \"10\"\n";
-        print BOLD(), BLUE(), "\t-i ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  ", BOLD(), "i", RESET(), "nt", RESET(), "\t;  $0 -i \"0xa\"\n";
-        print BOLD(), BLUE(), "\t-n ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> -i", BOLD(), "n", RESET(), "t  ->  hex", RESET(), "\t;  $0 -n -- -77\n";
-        print BOLD(), BLUE(), "\t-N ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> -hex  ->  i", BOLD(), "N", RESET(), "t", RESET(), "\t;  $0 -N 0xffffffb3\n";
-        print BOLD(), BLUE(), "\t-T ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> in", BOLD(), "T", RESET(), "   ->  bin", RESET(), "\t;  $0 -T 30\n";
-        print BOLD(), BLUE(), "\t-t ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> bin   ->  in", BOLD(), "t", RESET(), "\t;  $0 -t 1010\n";
-        print BOLD(), BLUE(), "\t-F ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "F", RESET(), "loat ->  hex", RESET(), "\t;  $0 -F 3.33\n";
-        print BOLD(), BLUE(), "\t-l ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  f", BOLD(), "l", RESET(), "oat", RESET(), "\t;  $0 -l 0x40551ed8\n";
-        print BOLD(), BLUE(), "\t-o ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "o", RESET(), "ctal ->  hex", RESET(), "\t;  $0 -o 35\n";
-        print BOLD(), BLUE(), "\t-O ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   ->  ", BOLD(), "O", RESET(), "ctal", RESET(), "\t;  $0 -O 0x12\n";
-        print BOLD(), BLUE(), "\t-0 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> bin   -> ", BOLD(), "", RESET(), " hex", RESET(), "\t;  $0 -0 1100011\n";
-        print BOLD(), BLUE(), "\t-1 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex   -> ", BOLD(), "", RESET(), " bin", RESET(), "\t;  $0 -1 0x63\n";
-        print BOLD(), BLUE(), "\t-2 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA1 checksum", RESET(), "\t;  $0 -2 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-3 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA224 checksum", RESET(), "\t;  $0 -3 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-4 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA256 checksum", RESET(), "\t;  $0 -4 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-5 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA384 checksum", RESET(), "\t;  $0 -5 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-6 ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> SHA512 checksum", RESET(), "\t;  $0 -6 \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-m ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> ", BOLD(), "m", RESET(), "d5 digest", RESET(), "\t\t;  $0 -m \"hello world\"\n";
-        print BOLD(), BLUE(), "\t-e ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> int -> hex (n", BOLD(), "e", RESET(), "twork-byte order)", RESET(), "\t;  $0 -e 4444\n";
-        print BOLD(), BLUE(), "\t-E ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t", RESET(), "=> hex (n", BOLD(), "E", RESET(), "twork-byte order) ->  int", RESET(), "\t;  $0 -E 5c11\n";
+	print "  COMMAND LINE ARGUMENTS\n", RESET();
+	print BOLD(), BLUE(), "   -M", CYAN(), "|", BLUE(), "--menu\t", RESET(), "=> ", BOLD(), "M", RESET(), "enu-driven GUI", RESET(), "\t\t ;  $0 -M\n";
+	print BOLD(), BLUE(), "   -U", CYAN(), "|", BLUE(), "--URL\t", RESET(), "=> ", BOLD(), "U", RESET(), "RL encode", RESET(), "\t\t\t ;  $0 -U \"hello world\"\n";
+	print BOLD(), BLUE(), "   -u", CYAN(), "|", BLUE(), "--url\t", RESET(), "=> ", BOLD(), "u", RESET(), "RL decode", RESET(), "\t\t\t ;  $0 -u \"hello%20world\"\n";
+	print BOLD(), BLUE(), "   -D", CYAN(), "|", BLUE(), "--DURL\t", RESET(), "=> ", BOLD(), "D", RESET(), "ouble URL encode", RESET(), "\t\t ;  $0 -U \"hello world\"\n";
+	print BOLD(), BLUE(), "   -d", CYAN(), "|", BLUE(), "--durl\t", RESET(), "=> ", BOLD(), "d", RESET(), "ouble URL decode", RESET(), "\t\t ;  $0 -u \"hello%2520world\"\n";
+	print BOLD(), BLUE(), "   -B", CYAN(), "|", BLUE(), "--BASE64\t", RESET(), "=> ", BOLD(), "B", RESET(), "ase64 encode", RESET(), "\t\t ;  $0 -B \"hello world\"\n";
+        print BOLD(), BLUE(), "   -b", CYAN(), "|", BLUE(), "--base64\t", RESET(), "=> ", BOLD(), "b", RESET(), "ase64 decode", RESET(), "\t\t ;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
+        print BOLD(), BLUE(), "   -H", CYAN(), "|", BLUE(), "--HTML\t", RESET(), "=> ", BOLD(), "H", RESET(), "TML encode", RESET(), "\t\t\t ;  $0 -H \"<hello world>\"\n";
+        print BOLD(), BLUE(), "   -h", CYAN(), "|", BLUE(), "--html\t", RESET(), "=> ", BOLD(), "h", RESET(), "TML decode", RESET(), "\t\t\t ;  $0 -h \"&lt;hello world&gt;\"\n";
+        print BOLD(), BLUE(), "   -X", CYAN(), "|", BLUE(), "--HEX\t", RESET(), "=> ascii ->  he", BOLD(), "X", RESET(), "\t\t ;  $0 -X \"hello world\"\n";
+        print BOLD(), BLUE(), "   -x", CYAN(), "|", BLUE(), "--hex\t", RESET(), "=> he", BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t\t ;  $0 -x \"68656c6c6f20776f72664\"\n";
+	print BOLD(), BLUE(), "\t--esc", RESET(), "   :: output in ", BOLD(), "esc", RESET(), "aped string\t    ; \"\\x00\\x01\\x02\\x03 ...\"\n";
+	print BOLD(), BLUE(), "\t--pair", RESET(), "  :: output in hex", BOLD(), "pair", RESET(), " format\t    ; 00010203 ...\n";
+        print BOLD(), BLUE(), "   -I", CYAN(), "|", BLUE(), "--INT\t", RESET(), "=> ", BOLD(), "I", RESET(), "nt   ->  hex", RESET(), "\t\t ;  $0 -I \"10\"\n";
+        print BOLD(), BLUE(), "   -i", CYAN(), "|", BLUE(), "--int\t", RESET(), "=> hex   ->  ", BOLD(), "i", RESET(), "nt", RESET(), "\t\t ;  $0 -i \"0xa\"\n";
+        print BOLD(), BLUE(), "   -n", CYAN(), "|", BLUE(), "--nint\t", RESET(), "=> -i", BOLD(), "n", RESET(), "t  ->  hex", RESET(), "\t\t ;  $0 -n ", BOLD(), "--", RESET(), " -77\n";
+        print BOLD(), BLUE(), "   -N", CYAN(), "|", BLUE(), "--NHEX\t", RESET(), "=> -hex  ->  i", BOLD(), "N", RESET(), "t", RESET(), "\t\t ;  $0 -N 0xffffffb3\n";
+        print BOLD(), BLUE(), "   -T", CYAN(), "|", BLUE(), "--INTB\t", RESET(), "=> in", BOLD(), "T", RESET(), "   ->  bin", RESET(), "\t\t ;  $0 -T 30\n";
+        print BOLD(), BLUE(), "   -t", CYAN(), "|", BLUE(), "--bint\t", RESET(), "=> bin   ->  in", BOLD(), "t", RESET(), "\t\t ;  $0 -t 1010\n";
+        print BOLD(), BLUE(), "   -F", CYAN(), "|", BLUE(), "--FLOATH\t", RESET(), "=> ", BOLD(), "F", RESET(), "loat ->  hex", RESET(), "\t\t ;  $0 -F 3.33\n";
+        print BOLD(), BLUE(), "   -l", CYAN(), "|", BLUE(), "--hfloat\t", RESET(), "=> hex   ->  f", BOLD(), "l", RESET(), "oat", RESET(), "\t\t ;  $0 -l 0x40551ed8\n";
+        print BOLD(), BLUE(), "   -o", CYAN(), "|", BLUE(), "--octh\t", RESET(), "=> ", BOLD(), "o", RESET(), "ctal ->  hex", RESET(), "\t\t ;  $0 -o 35\n";
+        print BOLD(), BLUE(), "   -O", CYAN(), "|", BLUE(), "--HOCT\t", RESET(), "=> hex   ->  ", BOLD(), "O", RESET(), "ctal", RESET(), "\t\t ;  $0 -O 0x12\n";
+        print BOLD(), BLUE(), "   -0", CYAN(), "|", BLUE(), "--binh\t", RESET(), "=> bin   -> ", BOLD(), "", RESET(), " hex", RESET(), "\t\t ;  $0 -0 1100011\n";
+        print BOLD(), BLUE(), "   -1", CYAN(), "|", BLUE(), "--hexb\t", RESET(), "=> hex   -> ", BOLD(), "", RESET(), " bin", RESET(), "\t\t ;  $0 -1 0x63\n";
+        print BOLD(), BLUE(), "   -2", CYAN(), "|", BLUE(), "--SHA1\t", RESET(), "=> SHA1 checksum", RESET(), "\t\t ;  $0 -2 \"hello world\"\n";
+        print BOLD(), BLUE(), "   -3", CYAN(), "|", BLUE(), "--SHA224\t", RESET(), "=> SHA224 checksum", RESET(), "\t\t ;  $0 -3 \"hello world\"\n";
+        print BOLD(), BLUE(), "   -4", CYAN(), "|", BLUE(), "--SHA256\t", RESET(), "=> SHA256 checksum", RESET(), "\t\t ;  $0 -4 \"hello world\"\n";
+        print BOLD(), BLUE(), "   -5", CYAN(), "|", BLUE(), "--SHA384\t", RESET(), "=> SHA384 checksum", RESET(), "\t\t ;  $0 -5 \"hello world\"\n";
+        print BOLD(), BLUE(), "   -6", CYAN(), "|", BLUE(), "--SHA512\t", RESET(), "=> SHA512 checksum", RESET(), "\t\t ;  $0 -6 \"hello world\"\n";
+        print BOLD(), BLUE(), "   -7", CYAN(), "|", BLUE(), "--ROT13\t", RESET(), "=> ROT13 encode", RESET(), "\t\t\t ;  $0 -7 \"hello world\"\n";
+        print BOLD(), BLUE(), "   -8", CYAN(), "|", BLUE(), "--rot13\t", RESET(), "=> ROT13 decode", RESET(), "\t\t\t ;  $0 -8 \"uryyb jbeyq\"\n";
+        print BOLD(), BLUE(), "   -9", CYAN(), "|", BLUE(), "--stack\t", RESET(), "=> push string 2 stack (corelan)", RESET(), " ;  $0 -9 \"hello world\"\n";
+	print BOLD(), BLUE(), "\t--esc", RESET(), "   :: output in ", BOLD(), "esc", RESET(), "aped string\t    ; \"\\x00\\x01\\x02\\x03 ...\"\n";
+	print BOLD(), BLUE(), "\t--pair", RESET(), "  :: output in hex", BOLD(), "pair", RESET(), " format\t    ; 00010203 ...\n";
+	print BOLD(), BLUE(), "\t--ansiC", RESET(), " :: output in ", BOLD(), "C", RESET(), " format\t\t    ; 0x00, 0x01, 0x02, 0x03 ...\n";
+        print BOLD(), BLUE(), "   -m", CYAN(), "|", BLUE(), "--md5\t", RESET(), "=> ", BOLD(), "m", RESET(), "d5 digest", RESET(), "\t\t\t ;  $0 -m \"hello world\"\n";
+        print BOLD(), BLUE(), "   -e", CYAN(), "|", BLUE(), "--net\t", RESET(), "=> int -> hex (n", BOLD(), "e", RESET(), "t-byte order)", RESET(), "   ;  $0 -e 4444\n";
+        print BOLD(), BLUE(), "   -E", CYAN(), "|", BLUE(), "--NET\t", RESET(), "=> hex (n", BOLD(), "E", RESET(), "t-byte order) ->  int", RESET(), "  ;  $0 -E 5c11\n";
+        print BOLD(), BLUE(), "   -r", CYAN(), "|", BLUE(), "--rbin\t", RESET(), "=> binary [", BOLD(), "file", RESET(), "] -> hex (corelan)", RESET(), ";  $0 -r -f /tmp/msgbox.bin\n";
+        print BOLD(), BLUE(), "   -w", CYAN(), "|", BLUE(), "--wbin\t", RESET(), "=> hex [", BOLD(), "file", RESET(), "] -> binary [", BOLD(), "file", RESET(), "]", "\t ;  $0 -w -f <", BOLD(), "INfile", RESET(), "> <", BOLD(), "OUTfile", RESET(), ">\n";
+
+	print BOLD(), BLUE(), "\t--esc", RESET(), "   :: output in ", BOLD(), "esc", RESET(), "aped string\t    ; \"\\x00\\x01\\x02\\x03 ...\"\n";
+	print BOLD(), BLUE(), "\t--pair", RESET(), "  :: output in hex", BOLD(), "pair", RESET(), " format\t    ; 00010203 ...\n";
+	print BOLD(), BLUE(), "\t--ansiC", RESET(), " :: output in ", BOLD(), "C", RESET(), " format\t\t    ; 0x00, 0x01, 0x02, 0x03 ...\n";
         print "\n";
-        print BOLD(), BLUE(), "\t-s ", RESET(), BOLD(), "", BOLD(), BLUE(), "\t\t", RESET(), "=> ", BOLD(), "s", RESET(), "uppress (display result ", RESET(), BOLD(), "only", RESET(), ")\n", RESET();
-        print BOLD(), BLUE(), "\t-f <", RESET(), BOLD(), "filename", BOLD(), BLUE(), ">\t", RESET(), "=> use a file as input, instead of a string on the command-line\n", RESET();
-        print BOLD(), BLUE(), "\t--help\t\t", RESET(), "=> displays help\n";
-        print BOLD(), BLUE(), "\t--version\t", RESET(), "=> displays version information\n";
+        print BOLD(), BLUE(), "   --color", CYAN(), "|", BLUE(), "--nocolor\t", RESET(), "=> enable/disable colored output [", BOLD(), "default is ENABLED", RESET(), "]\n";
+        print BOLD(), BLUE(), "   --corelan\t\t", RESET(), "=> display corelan reference\n";
+        print BOLD(), BLUE(), "   --help\t\t", RESET(), "=> displays help\n";
+        print BOLD(), BLUE(), "   --man\t\t", RESET(), "=> displays extended help with examples\n";
+        print BOLD(), BLUE(), "   --version\t\t", RESET(), "=> displays version information\n";
         print "\n";
-        print "\t\tEXAMPLES:  ", BOLD(), BLUE(), "$0 -b -s \"aGVsbG8gd29ybGQ=\"\n", RESET();
-        print "\t\t           ", BOLD(), BLUE(), "$0 -X -f /var/www/meterpreter.php\n", RESET();
-	exit 0;
+        print BOLD(), BLUE(), "   -s", BLUE(), "\t\t\t\t", RESET(), "=> ", BOLD(), "s", RESET(), "uppress (display result ", RESET(), BOLD(), "only", RESET(), ")\n", RESET();
+        print BOLD(), BLUE(), "   -f", CYAN(), "|", BLUE(), "--file ", BOLD(), CYAN(), "<", BLUE(), "file1", CYAN(), ">,<", BLUE(), "file2", CYAN(), ">\t", RESET(), "=> use file(s) as input\n", RESET();
+        print BOLD(), CYAN(), "   [", BLUE(), "string", CYAN(), "]\t\t\t", RESET(), "=> string as input\n";
+	exit(0);
 }
 
 ## default config values
@@ -99,6 +126,8 @@ Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opts,
    'URL|U'	=> \$opts{URL},
    'url|u'	=> \$opts{url},
+   'DURL|D'	=> \$opts{DURL},
+   'durl|d'	=> \$opts{durld},
    'BASE64|B'	=> \$opts{BASE64},
    'base64|b'	=> \$opts{base64},
    'HTML|H'	=> \$opts{HTML},
@@ -128,9 +157,13 @@ GetOptions(\%opts,
    'stack|9'	=> \$opts{stack},
    'net|e'	=> \$opts{net},
    'NET|E'	=> \$opts{NET},
+   'rbin|r'	=> \$opts{readbin},
+   'wbin|w'	=> \$opts{writebin},
    'ansiC'      => \$opts{ansiC},
    'pair'     	=> \$opts{pair},
    'esc'      	=> \$opts{esc},
+   'corelan|Z'	=> \$opts{corelan},
+   'menu|M'	=> \$opts{menu},
    'suppress|s'	=> \$opts{suppress},
    'file|f=s'	=> \@file,
    'color!'	=> \$opts{color},
@@ -138,9 +171,6 @@ GetOptions(\%opts,
    'man'	=> \$opts{man},
    'version' 	=> \$opts{version},
 );
-   #'man' 	=> sub { $opts{man} = 1; podtextcolor(); },
-#   'man' 	=> sub { pod2usage( { -verbose=>2 } ); exit; },
-   #'man' 	=> sub { pod2usage( { -verbose=>2, -input => \*DATA } ); exit; },
 
 ## user may want to disable color
 if ($HAS_COLOR and not $opts{color}) {
@@ -158,6 +188,7 @@ if ($HAS_COLOR) {
     *BLUE   = sub { };
     *WHITE  = sub { };
     *BOLD   = sub { };
+    *UNDERLINE = sub { };
 }
 
 my $RESET  = RESET()   || '';
@@ -168,6 +199,7 @@ my $GREEN  = GREEN()   || '';
 my $BLUE   = BLUE()    || '';
 my $WHITE  = WHITE()   || '';
 my $BOLD   = BOLD()    || '';
+my $UNDERLINE = UNDERLINE()    || '';
 
 if (($opts{man})) {
 	podtextcolor();
@@ -178,9 +210,12 @@ if (($opts{man})) {
 } elsif (($opts{help})) {
 	HELP_MESSAGE();
 	exit(0);
+} elsif (($opts{corelan})) {
+	corelan();
+	exit(0);
+} elsif (($opts{menu})) {
+	&main_menu;
 } elsif ( ! $ARGV[0] && ! @file ) {
-#} elsif ( ! $ARGV[0] && ! @file || ! $opts{man} || ! $opts{version} || ! $opts{help} ) {
-#if ( ! $ARGV[0] && ! @file || ! $opts{man} ) {
         HELP_MESSAGE();
         exit(0);
 };
@@ -206,8 +241,8 @@ if (@file) {
 			htmlfile() 	if $opts{html};
 			HEXfile() 	if $opts{HEX};
 			xfile() 	if $opts{hex};
-			INTfile() 	if $opts{INT};     # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
-			ifile() 	if $opts{int};     # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
+			INTfile() 	if $opts{INT};
+			ifile() 	if $opts{int};
 			INTBfile() 	if $opts{INTB};
 			bintfile() 	if $opts{bint};
 			FLOATHfile() 	if $opts{FLOATH};
@@ -215,7 +250,7 @@ if (@file) {
 			octhfile() 	if $opts{octh};
 			HOCTfile() 	if $opts{HOCT};
 			nintfile() 	if $opts{nint};
-			NHEXfile() 	if $opts{NHEX};    #  ./hURL -n -- -77
+			NHEXfile() 	if $opts{NHEX}; #  ./hURL -n -- -77
 			netfile() 	if $opts{net};
 			NETfile() 	if $opts{NET};
 			binhfile() 	if $opts{binh};
@@ -229,13 +264,16 @@ if (@file) {
 			unrotate13file()	if $opts{rot13};
 			md5file() 	if $opts{md5};
 			string2stackfile() if $opts{stack};
+			readbinfunc()   if $opts{readbin};
+			DURLfile()	if $opts{DURL};
+			durldfile()	if $opts{durld};
+			writebinfunc()  if $opts{writebin};
         	}
         	close(INPUTFILE);
 	}
 @file = undef;
 }
 
-#pod2usage(-verbose=>2) if $opts{H};
 URL() 		if $opts{URL};
 url() 		if $opts{url};
 BASE64() 	if $opts{BASE64};
@@ -244,8 +282,8 @@ HTML() 		if $opts{HTML};
 html() 		if $opts{html};
 HEX() 		if $opts{HEX};
 x() 		if $opts{hex};
-INT() 		if $opts{INT};     # || (@ARGV == 1 && $ARGV[0] =~ /([[:^xdigit:]])\d$/);
-i() 		if $opts{int};     # || (@ARGV == 1 && $ARGV[0] =~ /[[:xdigit:]]$/);
+INT() 		if $opts{INT};
+i() 		if $opts{int};
 INTB() 		if $opts{INTB};
 bint() 		if $opts{bint};
 FLOATH() 	if $opts{FLOATH};
@@ -253,7 +291,7 @@ hfloat() 	if $opts{hfloat};
 octh() 		if $opts{octh};
 HOCT() 		if $opts{HOCT};
 nint() 		if $opts{nint};
-NHEX() 		if $opts{NHEX};    #  ./hURL -n -- -77
+NHEX() 		if $opts{NHEX};
 net() 		if $opts{net};
 NET() 		if $opts{NET};
 binh() 		if $opts{binh};
@@ -267,7 +305,10 @@ rotate13() 	if $opts{ROT13};
 unrotate13() 	if $opts{rot13};
 md5() 		if $opts{md5};
 string2stack() 	if $opts{stack};
-#podtextcolor()	if $opts{man};
+corelan()	if $opts{corelan};
+DURL()		if $opts{DURL};
+durld()		if $opts{durld};
+main_menu()	if $opts{menu};
 
 sub podtextcolor {
         if ($HAS_COLOR) {
@@ -331,37 +372,94 @@ sub urlfile {
 sub HEX {
 	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
-		$myStringHex = unpack("H*", $string);
-		print BOLD(), "$myStringHex", RESET();
+                if (($opts{esc})) {
+			$myStringHex = unpack("H*", $string);
+                        $myStringHex =~ s/([[:xdigit:]]{2})/\\x$1/g;
+			print BOLD(), chr(34), "$myStringHex", chr(34), RESET();
+                } else {
+                        $myStringHex = unpack("H*", $string);
+                        print BOLD(), "$myStringHex", RESET();
+		}
 	} elsif ($ARGV[0]) {
 		$string = $ARGV[0];
-		$myStringHex = unpack("H*", $string);
+                if (($opts{esc})) {
+			$myStringHex = unpack("H*", $string);
+                        $myStringHex =~ s/([[:xdigit:]]{2})/\\x$1/g;
+			$myStringHex=chr(34).$myStringHex.chr(34);
+                } else {
+			$myStringHex = unpack("H*", $string);
+		}
 		print BOLD(), BLUE(), "\nOriginal    :: ", RESET(), BOLD(), "$string\n", RESET();
 		print BOLD(), CYAN(), "Hex ENcoded :: ", RESET(), BOLD(), "$myStringHex\n", RESET();
+
+                if (($opts{esc})) {
+                        $myStringHex =~ tr/"\\x//d;
+                } else {
+                }
 	}
 }
 
 sub HEXfile {
 	if (($opts{suppress}) && ($file)) {
-                $myStringHex = unpack("H*", $string);
-                print BOLD(), "$myStringHex", "\n", RESET();
+
+                if (($opts{esc})) {
+                        $myStringHex = unpack("H*", $string);
+                        $myStringHex =~ s/([[:xdigit:]]{2})/\\x$1/g;
+                        print BOLD(), chr(34), "$myStringHex", chr(34), "\n", RESET();
+                } else {
+                	$myStringHex = unpack("H*", $string);
+                	print BOLD(), "$myStringHex", "\n", RESET();
+                }
+
 	} else {
-                $myStringHex = unpack("H*", $string);
+
+		if (($opts{esc})) {
+			$myStringHex = unpack("H*", $string);
+                        $myStringHex =~ s/([[:xdigit:]]{2})/\\x$1/g;
+                        $myStringHex=chr(34).$myStringHex.chr(34);
+		} else {
+                	$myStringHex = unpack("H*", $string);
+		}
+ 
                 print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
                 print BOLD(), CYAN(), "Hex ENcoded   :: ", RESET(), BOLD(), "$myStringHex\n", RESET();
+
+                if (($opts{esc})) {
+                        $myStringHex =~ tr/"\\x//d;
+			print "File byte count: ".length($string)." bytes\n";
+                } else {
+			print "File byte count: ".length($string)." bytes\n";
+                }
+
         }
 }
 
 sub x {
 	if (($opts{suppress}) && ($ARGV[0])) {
 		$string = $ARGV[0];
+                $string =~ s/\\x//g;  # remove \x
+                $string =~ s/\\//g;   # remove \
+                $string =~ s/;//g;    # remove ;
+                $string =~ s/\"//g;   # remove "
+                $string =~ s/\.//g;   # remove .
+                $string =~ s/\r\n//g; # remove linefeed
+                $string =~ s/\n//g;   # remove newline
+                $string =~ s/\s//g;   # remove space
 		while($string =~ /(.{2})/sg) {
 			print BOLD(), chr(hex($1)), RESET();
 		}
 	} elsif ($ARGV[0]) {
 		$string = $ARGV[0];
-		print BOLD(), BLUE(), "\nOriginal HEX  :: ", RESET(), BOLD(), "$string\n", RESET();
-		print BOLD(), CYAN(), "ASCII DEcoded :: ", RESET();
+		$string =~ s/\\x//g;  # remove \x
+                $string =~ s/\\//g;   # remove \
+                $string =~ s/;//g;    # remove ;
+                $string =~ s/\"//g;   # remove "
+                $string =~ s/\.//g;   # remove .
+                $string =~ s/\r\n//g; # remove linefeed
+                $string =~ s/\n//g;   # remove newline
+                $string =~ s/\s//g;   # remove space
+		print BOLD(), BLUE(), "\nOriginal HEX      :: ", RESET(), BOLD(), "$string\n", RESET();
+		print BOLD(), CYAN(), "ASCII/RAW DEcoded :: ", RESET();
 
 		while($string =~ /(.{2})/sg) {
 			print BOLD(), chr(hex($1)), RESET();
@@ -372,12 +470,29 @@ sub x {
 
 sub xfile {
 	if (($opts{suppress}) && ($file)) {
+                $string =~ s/\\x//g;  # remove \x
+                $string =~ s/\\//g;   # remove \
+                $string =~ s/;//g;    # remove ;
+                $string =~ s/\"//g;   # remove "
+                $string =~ s/\.//g;   # remove .
+                $string =~ s/\r\n//g; # remove linefeed
+                $string =~ s/\n//g;   # remove newline
+                $string =~ s/\s//g;   # remove space
                 while($string =~ /(.{2})/sg) {
-                        print BOLD(), chr(hex($1)), "\n", RESET();
+                        print BOLD(), chr(hex($1)), RESET();
                 }
+		print "\n";
 	} else {
-                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
-                print BOLD(), CYAN(), "ASCII DEcoded :: ", RESET();
+                $string =~ s/\\x//g;  # remove \x
+                $string =~ s/\\//g;   # remove \
+                $string =~ s/;//g;    # remove ;
+                $string =~ s/\"//g;   # remove "
+                $string =~ s/\.//g;   # remove .
+                $string =~ s/\r\n//g; # remove linefeed
+                $string =~ s/\n//g;   # remove newline
+                $string =~ s/\s//g;   # remove space
+                print BOLD(), BLUE(), "\nOriginal file     :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "ASCII/RAW DEcoded :: ", RESET();
                 while($string =~ /(.{2})/sg) {
                         print BOLD(), chr(hex($1)), RESET();
 
@@ -410,7 +525,7 @@ sub md5file {
                 my $file = shift || "$file";
                 open(FILE, $file) or die "Can't open '$file': $!";
                 binmode(FILE);
-                print BOLD(), CYAN(), "MD5 digest of file :: " . Digest::MD5->new->addfile(*FILE)->hexdigest, "\n";
+                print BOLD() . CYAN() . "MD5 digest of file :: " . RESET() . BOLD() . Digest::MD5->new->addfile(*FILE)->hexdigest . "\n" . RESET();
         }
 }
 
@@ -978,7 +1093,6 @@ sub unrotate13 {
                 print BOLD(), BLUE(), "\nOriginal string   :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
                 print BOLD(), CYAN(), "ROT13 decoded     :: ", RESET(), BOLD(), "$string\n", RESET();
         }
-	
 }
 
 sub unrotate13file {
@@ -994,8 +1108,10 @@ sub unrotate13file {
 
 sub string2stack {
         if (($opts{suppress}) && ($ARGV[0])) {
+		$string = $ARGV[0];
 		str2stksuppress($string);
         } elsif ($ARGV[0]) {
+		$string = $ARGV[0];
 		str2stk($string);
 	}
 }
@@ -1010,6 +1126,10 @@ sub string2stackfile {
         }
 }
 
+# Perl script written by Peter Van Eeckhoutte
+# http://svn.corelan.be:8800/svn/shellcoding/scripts/pvePushString.pl
+# - slight modifications by fnord0
+#
 sub str2stk ($) {
 		if ($file) {
 			$strToPush=$string;
@@ -1025,9 +1145,10 @@ sub str2stk ($) {
 		$strPush="";
 		$hexWord="";
 		print BOLD(), BLUE(), "\nString length :: ", RESET(), BOLD(), length($strToPush), "\n", RESET();
-		print BOLD(), CYAN(), "Opcodes to push this string onto the stack + terminating NULL BYTE (\\x00) ::\n\n", RESET();
+		print BOLD(), BLUE(), "Opcodes to push this string onto the stack + terminating NULL BYTE (", RED(), "\\x00", BLUE(), ") ::\n\n", RESET();
                 if (($opts{ansiC})) {
 			print BOLD(), "unsigned char shellcode[] = {\n", RESET();
+
                         $strHexy = "0x";
                         $strDelimit = ",";
                         while ($cnt < length($strToPush))
@@ -1070,16 +1191,17 @@ sub str2stk ($) {
 
                                 $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
 
-				$strHex="  0x68,".$strHex." 0x00, "."   /* PUSH 0x00".
+				$strHex="  0x68,".$strHex. BOLD() . RED() . " 0x00" . RESET() . ",    /* PUSH 0x" . BOLD() . RED() . "00" . RESET() .
                                 substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39) . " */";
                                 $strOpcodes=$strHex."\n".$strOpcodes;
                         }
                         else
                         {
                           ##add line with spaces + null byte (string terminator)
-			$strOpcodes="  0x68, 0x20, 0x20, 0x20, 0x00, "."   /* PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\' */\n".$strOpcodes;
+			$strOpcodes="  0x68, 0x20, 0x20, 0x20, " . BOLD() . RED() . "0x00" . RESET() . ",    /* PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\' */\n".$strOpcodes;
                         }
-		print $strOpcodes . BOLD() . "};" . RESET();
+		print $strOpcodes . BOLD() . "};\n" . RESET();
+
 
                 } elsif (($opts{pair})) {
                         $strHexy = '';
@@ -1119,20 +1241,21 @@ sub str2stk ($) {
                                 $strPush = $strHex;
                                 $hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
 
-                                $strHex="68".$strHex."00"."    # PUSH 0x00".
+                                $strHex="68".$strHex . BOLD() . RED() . "00" . RESET() . "    # PUSH 0x" . BOLD() . RED() . "00" . RESET() .
                                 substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
                                 $strOpcodes=$strHex."\n".$strOpcodes;
                         }
                         else
                         {
                           #add line with spaces + null byte (string terminator)
-                        $strOpcodes="6820202000 "."   # PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+                        $strOpcodes="68202020" . BOLD() . RED() . "00 " . RESET() . "   # PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
                         }
 		print $strOpcodes;
 
                 } else {
                         $strHexy = "\\x";
                         $strDelimit = '';
+
 	                while ($cnt < length($strToPush))
 	                {
 	                  $strThisChar=substr($strToPush,$cnt,1);
@@ -1169,19 +1292,23 @@ sub str2stk ($) {
                   		$strPush =~ tr/\\x//d;
                   		$hexWord=substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
 
-                  		$strHex=chr(34)."\\x68".$strHex."\\x00".chr(34)."    //PUSH 0x00".
+                  		$strHex=chr(34)."\\x68".$strHex . BOLD() . RED() . "\\x00" . RESET() . chr(34)."    //PUSH 0x" . BOLD() . RED() . "00" . RESET() .
                   		substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . " " . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
                   		$strOpcodes=$strHex."\n".$strOpcodes;
                		}
                 	else
                 	{
                		  ##add line with spaces + null byte (string terminator)
-                  	  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20\\x00".chr(34)."    //PUSH 0x00202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+                  	  $strOpcodes=chr(34)."\\x68\\x20\\x20\\x20" . BOLD() . RED() . "\\x00" . RESET() . chr(34)."    //PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
                 	}
 		print $strOpcodes;
 		}
 }
 
+# Perl script written by Peter Van Eeckhoutte
+# http://svn.corelan.be:8800/svn/shellcoding/scripts/pvePushString.pl
+# - slight modifications by fnord0
+#
 sub str2stksuppress ($) {
 		if ($file) {
 			$strToPush=$string;
@@ -1243,7 +1370,7 @@ sub str2stksuppress ($) {
                           ##add line with spaces + null byte (string terminator)
 			$strOpcodes="  0x68, 0x20, 0x20, 0x20, 0x00, ".$strOpcodes;
                         }
-		print $strOpcodes . BOLD() . "};" . RESET();
+		print $strOpcodes . BOLD() . "};\n" . RESET();
 
                 } elsif (($opts{pair})) {
                         $strHexy = '';
@@ -1346,231 +1473,2398 @@ sub hex2ascii ($)
    return $str;
 }
 
+sub readbinfunc {
+        if (($opts{suppress}) && ($file)) {
+                pveReadbinsuppress($string);
+                print "\n";
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file", RESET(), "\n";
+                pveReadbin($string);
+        }
+}
+
+# Perl script written by Peter Van Eeckhoutte
+# http://svn.corelan.be:8800/svn/shellcoding/scripts/pveReadbin.pl
+# - slight modifications by fnord0
+#
+sub pveReadbin ($) {
+	open(FILE, $file) or die "Can't open '$file': $!";
+	binmode(FILE); #open file in binary mode
+	my ($data, $n, $strContent);
+        $strContent="";
+        my $cnt=0;
+	my $offset=0;
+        while (($n = read FILE, $data, 1, $offset) != 0) {
+ 	       $offset += $n;
+        }
+        close(FILE);
+        print "Read ", BOLD(), $offset, RESET(), " bytes\n\n";
+        $cnt=0;
+        my $nullbyte=0;
+        if (($opts{ansiC})) {
+		print BOLD(), "unsigned char shellcode[] = {\n", RESET();
+        } elsif (($opts{pair})) {
+		print chr(34);
+	} else {
+        	print chr(34);
+	}
+        for ($i=0; $i < (length($data)); $i++) {
+  		my $c = substr($data, $i, 1);
+  		my $str1 = sprintf("%01x", ((ord($c) & 0xf0) >> 4) & 0x0f);
+  		my $str2 = sprintf("%01x", ord($c) & 0x0f);
+	  	if ($cnt < 8) {
+               		if (($opts{ansiC})) {
+	   			if (($str1 eq "0") && ($str2 eq "0")) {
+					print BOLD(), RED(), "0x00", RESET(), ", ";
+				} else {
+					if ($cnt==0) {
+						print "  0x".$str1.$str2.", ";
+					} else {
+						print "0x".$str1.$str2.", ";
+					}
+			}
+    				$cnt=$cnt+1;	
+
+                	} elsif (($opts{pair})) {
+    				if (($str1 eq "0") && ($str2 eq "0")) {
+					print BOLD(), RED(), "00", RESET();
+				} else {
+					print "$str1"."$str2";
+				}
+    				$cnt=$cnt+1;	
+              		} else {
+    				if (($str1 eq "0") && ($str2 eq "0")) {
+					print BOLD(), RED(), "\\x00", RESET();
+				} else {
+					print "\\x".$str1.$str2;
+				}
+    				$cnt=$cnt+1;	
+			}	
+		} else {
+
+               		if (($opts{ansiC})) {
+				if (($str1 eq "0") && ($str2 eq "0")) {
+					$cnt=1;
+					print "\n  " . BOLD() . RED() . "0x00" . RESET() . ", ";
+				} else {
+			    		$cnt=1;
+  					print "\n  0x".$str1.$str2.", ";
+				}
+
+                	} elsif (($opts{pair})) {
+				if (($str1 eq "0") && ($str2 eq "0")) {
+					$cnt=1;
+					print chr(34)."\n".chr(34), BOLD(), RED(), "00", RESET();
+				} else {
+			    		$cnt=1;
+  					print chr(34)."\n".chr(34).$str1.$str2;
+				}
+              		} else {
+				if (($str1 eq "0") && ($str2 eq "0")) {
+					$cnt=1;
+					print chr(34)."\n".chr(34), BOLD(), RED(), "\\x00", RESET();
+				} else {
+			    		$cnt=1;
+  					print chr(34)."\n".chr(34)."\\x".$str1.$str2;
+				}
+			}
+		}
+  		if (($str1 eq "0") && ($str2 eq "0")) {
+  			$nullbyte=$nullbyte+1;
+		}
+	}
+   	if (($opts{ansiC})) {
+		print BOLD() . "\n};\n" . RESET();
+		print "\nNumber of ", BOLD(), "NULL", RESET(), " bytes : ", BOLD(), $nullbyte, RESET(), "\n";
+        } elsif (($opts{pair})) {
+		print chr(34).";\n";
+		print "\nNumber of ", BOLD(), "NULL", RESET(), " bytes : ", BOLD(), $nullbyte, RESET(), "\n";
+        } else {
+		print chr(34).";\n";
+		print "\nNumber of ", BOLD(), "NULL", RESET(), " bytes : ", BOLD(), $nullbyte, RESET(), "\n";
+	}
+}
+
+# Perl script written by Peter Van Eeckhoutte
+# http://svn.corelan.be:8800/svn/shellcoding/scripts/pveReadbin.pl
+# - slight modifications by fnord0
+#
+sub pveReadbinsuppress ($) {
+	open(FILE, $file) or die "Can't open '$file': $!";
+	binmode(FILE); #open file in binary mode
+	my ($data, $n, $strContent);
+        $strContent="";
+        my $cnt=0;
+	my $offset=0;
+        while (($n = read FILE, $data, 1, $offset) != 0) {
+ 	       $offset += $n;
+        }
+        close(FILE);
+
+        $cnt=0;
+        my $nullbyte=0;
+        if (($opts{ansiC})) {
+		print BOLD(), "unsigned char shellcode[] = {\n", RESET();
+        } elsif (($opts{pair})) {
+		print chr(34);
+	} else {
+        	print chr(34);
+	}
+        for ($i=0; $i < (length($data)); $i++) {
+  		my $c = substr($data, $i, 1);
+  		my $str1 = sprintf("%01x", ((ord($c) & 0xf0) >> 4) & 0x0f);
+  		my $str2 = sprintf("%01x", ord($c) & 0x0f);
+	  	if ($cnt < 8) {
+               		if (($opts{ansiC})) {
+	   			if (($str1 eq "0") && ($str2 eq "0")) {
+					print BOLD(), RED(), "0x00", RESET(), ", ";
+				} else {
+					if ($cnt==0) {
+						print "  0x".$str1.$str2.", ";
+					} else {
+						print "0x".$str1.$str2.", ";
+					}
+			}
+    				$cnt=$cnt+1;	
+
+                	} elsif (($opts{pair})) {
+    				if (($str1 eq "0") && ($str2 eq "0")) {
+					print BOLD(), RED(), "00", RESET();
+				} else {
+					print "$str1"."$str2";
+				}
+    				$cnt=$cnt+1;	
+              		} else {
+    				if (($str1 eq "0") && ($str2 eq "0")) {
+					print BOLD(), RED(), "\\x00", RESET();
+				} else {
+					print "\\x".$str1.$str2;
+				}
+    				$cnt=$cnt+1;	
+			}	
+		} else {
+
+               		if (($opts{ansiC})) {
+				if (($str1 eq "0") && ($str2 eq "0")) {
+					$cnt=1;
+					print "\n  " . BOLD() . RED() . "0x00" . RESET() . ", ";
+				} else {
+			    		$cnt=1;
+  					print "\n  0x".$str1.$str2.", ";
+				}
+
+                	} elsif (($opts{pair})) {
+				if (($str1 eq "0") && ($str2 eq "0")) {
+					$cnt=1;
+					print chr(34)."\n".chr(34), BOLD(), RED(), "00", RESET();
+				} else {
+			    		$cnt=1;
+  					print chr(34)."\n".chr(34).$str1.$str2;
+				}
+              		} else {
+				if (($str1 eq "0") && ($str2 eq "0")) {
+					$cnt=1;
+					print chr(34)."\n".chr(34), BOLD(), RED(), "\\x00", RESET();
+				} else {
+			    		$cnt=1;
+  					print chr(34)."\n".chr(34)."\\x".$str1.$str2;
+				}
+			}
+		}
+  		if (($str1 eq "0") && ($str2 eq "0")) {
+  			$nullbyte=$nullbyte+1;
+		}
+	}
+   	if (($opts{ansiC})) {
+		print BOLD() . "\n};\n" . RESET();
+        } elsif (($opts{pair})) {
+		print chr(34).";\n";
+        } else {
+		print chr(34).";\n";
+	}
+}
+
+sub DURL {
+        if (($opts{suppress}) && ($ARGV[0])) {
+                $string = $ARGV[0];
+                print BOLD(), CGI::escape(CGI::escape("$string")), RESET();
+        } elsif (($ARGV[0])) {
+                $string = $ARGV[0];
+                print BOLD(), BLUE(), "\nOriginal     :: ",  RESET(), BOLD(), "$string\n", RESET();
+                print BOLD(), CYAN(), "2xURL ENcoded:: ", RESET(), BOLD(), CGI::escape(CGI::escape("$string")) . "\n", RESET();
+        }
+}
+
+sub DURLfile {
+        if (($opts{suppress}) && ($file)) {
+                print BOLD(), CGI::escape(CGI::escape("$string")), "\n", RESET();
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "2xURL ENcoded :: ", RESET(), BOLD(), CGI::escape(CGI::escape("$string")) . "\n", RESET();
+        }
+}
+
+
+sub durld {
+        if (($opts{suppress}) && ($ARGV[0])) {
+                $string = $ARGV[0];
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), "$string", RESET();
+        } elsif ($ARGV[0]) {
+                $string = $ARGV[0];
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), BLUE(), "\nOriginal      :: ", RESET(), BOLD(), "$ARGV[0]\n", RESET();
+                print BOLD(), CYAN(), "2xURL DEcoded :: ", RESET(), BOLD(), "$string\n", RESET();
+        }
+}
+
+sub durldfile {
+        if (($opts{suppress}) && ($file)) {
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), "$string", "\n", RESET();
+        } else {
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                $string =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file\n", RESET();
+                print BOLD(), CYAN(), "2xURL DEcoded  :: ", RESET(), BOLD(), "$string\n", RESET();
+        }
+}
+
+sub writebinfunc {
+        if (($opts{suppress}) && ($file)) {
+                writebinsuppress($string);
+                print "\n";
+        } else {
+                print BOLD(), BLUE(), "\nOriginal file :: ", RESET(), BOLD(), "$file", RESET(), "\n";
+                writebin($string);
+        }
+}
+
+# inspired by Perl script written by Peter Van Eeckhoutte
+# http://svn.corelan.be:8800/svn/shellcoding/scripts/pveWritebin.pl
+#
+sub writebin {
+	if (-e $ARGV[0]) {
+		system("rm $ARGV[0]");
+	}
+	my $count = 0;
+	my $len = 0;
+	open(IN, "< $file");
+	open(OUT, "> $ARGV[0]");
+	binmode(OUT);
+	while (<IN>) {
+		chop;
+		s/\\x//g;
+		s/\"//g;
+		s/;//g;
+		s/\.//g;
+		s/\r\n//g;
+		s/\n//g;
+		s/\s//g;
+		s/0x([[:xdigit:]])/$1/g;
+		s/x//g;
+		$len = length($_);
+       		$count += $len/2;
+       		print (OUT pack("H$len", $_));
+	}
+	close(IN);
+	close(OUT);
+	print "Wrote $count bytes to file :: " . BOLD() . "$ARGV[0]\n" . RESET();
+}
+
+# inspired by Perl script written by Peter Van Eeckhoutte
+# http://svn.corelan.be:8800/svn/shellcoding/scripts/pveWritebin.pl
+#
+sub writebinsuppress {
+        if (-e $ARGV[0]) {
+                system("rm $ARGV[0]");
+        }
+        my $count = 0;
+        my $len = 0;
+        open(IN, "< $file");
+        open(OUT, "> $ARGV[0]");
+        binmode(OUT);
+        while (<IN>) {
+                chop;
+                s/\\x//g;
+                s/\"//g;
+                s/;//g;
+                s/\.//g;
+                s/\r\n//g;
+                s/\n//g;
+                s/\s//g;
+                s/0x([[:xdigit:]])/$1/g;
+                s/x//g;
+                $len = length($_);
+                $count += $len/2;
+                print (OUT pack("H$len", $_));
+        }
+        close(IN);
+        close(OUT);
+}
+
+sub main_menu {
+	$ARGV[0] = undef;
+	$file = undef;
+	$opts{esc} = undef;
+	$opts{pair} = undef;
+	$opts{ansiC} = undef;
+	print "\t[========================================================]\n";
+	print "\t[          hURL - $VERSION by fnord0 - \@COPYLEFT             ]\n";
+	print "\t[========================================================]\n";
+	print "\n";
+        print BOLD() . " ## \tCommand\t\t\tExample Input\t\tExample Output\n" . RESET();
+        print " ---\t----------------\t-------------\t\t--------------\n";
+	print "  1)\tURL encode\t\thello world\t\thello%20world\n";
+	print "  2)\tURL decode\t\thello%20world\t\thello world\n";
+	print "  3)\tDouble URL encode\thello world\t\thello%2520world\n";
+	print "  4)\tDouble URL decode\thello%2520world\t\thello world\n";
+	print "  5)\tBase64 encode\t\thello world\t\taGVsbG8gd29ybGQ=\n";
+	print "  6)\tBase64 decode\t\taGVsbG8gd29ybGQ=\thello world\n";
+	print "  7)\tHTML encode\t\t<hello world>\t\t&lt;hello world&gt;\n";
+	print "  8)\tHTML decode\t\t&lt;hello world&gt;\thello world\n";
+	print "  9)\tRAW/ascii -> HEX\thello world\t\t68656c6c6f20776f726c64\n";
+	print " 10)\tHEX   ->  RAW/ascii\t68656c6c6f20776f726c64\thello world\n";
+	print " 11)\tINT   ->  HEX\t\t10\t\t\t0xa\n";
+	print " 12)\tHEX   ->  INT\t\t0xa\t\t\t10\n";
+	print " 13)\t-INT  ->  HEX\t\t-77\t\t\tFFFFFFFFFFFFFFB3\n";
+	print " 14)\t-HEX  ->  INT\t\tFFFFFFB3\t\t-77\n";
+	print " 15)\tINT   ->  BIN\t\t30\t\t\t00011110\n";
+	print " 16)\tBIN   ->  INT\t\t1010\t\t\t10\n";
+	print " 17)\tFLOAT ->  HEX\t\t3.33\t\t\t0xb81e5540\n";
+	print " 18)\tHEX   ->  FLOAT\t\t0x40551ed8\t\t1079320280.000000\n";
+	print " 19)\tOCTAL ->  HEX\t\t35\t\t\t0x1d\n";
+	print " 20)\tHEX   ->  octal\t\t0x1d\t\t\t35\n";
+	print " 21)\tBIN   ->  HEX\t\t1100011\t\t\t0x63\n";
+	print " 22)\tHEX   ->  BIN\t\t63\t\t\t1100011\n";
+	print " 23)\tSHA1 checksum\t\thello world\t\t2aae6c35c94fcfb415dbe95f408b9ce9...\n";
+	print " 24)\tSHA224 checksum\t\thello world\t\t2f05477fc24bb4faefd86517156dafde...\n";
+	print " 25)\tSHA256 checksum\t\thello world\t\tb94d27b9934d3e08a52e52d7da7dabfa...\n";
+	print " 26)\tSHA384 checksum\t\thello world\t\tfdbd8e75a67f29f701a4e040385e2e23...\n";
+	print " 27)\tSHA512 checksum\t\thello world\t\t309ecc489c12d6eb4cc40f50c902f2b4...\n";
+	print " 28)\tROT13 encode\t\thello world\t\turyyb jbeyq\n";
+	print " 29)\tROT13 decode\t\turyyb jbeyq\t\thello world\n";
+	print " 30)\tMD5 digest\t\thello world\t\t5eb63bbbe01eeed093cb22bb8f5acdc3\n";
+	print "\n";
+	print BOLD() . " ## \tCommands useful for shellcode creation\t Input\t       Output\n" . RESET();
+	print " ---\t--------------------------------------\t -----\t       ------\n";
+	print " 31)\tpush string 2 stack (corelanc0d3r)\t hello world   ASM code to push string to stack\n";
+	print " 32)\tBINARY [infile] -> HEX (corelanc0d3r)\t BINARY FILE   HEX to screen + counts NULL bytes\n";
+	print " 33)\tHEX [infile] -> BINARY [outfile]\t HEX FILE      BINARY FILE\n";
+	print " 34)\tINT -> HEX (network-byte order)\t\t 4444\t       5c11\n";
+	print " 35)\tHEX (network-byte order) -> INT\t\t 5c11\t       4444\n";
+	print "\n";
+        print " 99)\tExit hURL\n\n";
+        print CYAN(), UNDERLINE(), "hURL", RESET();
+        print BOLD(), "> ", RESET();
+        $select = <STDIN>;
+        chomp ($select);
+        if ($select =~ /^1$/){&menu_URL}
+        if ($select =~ /^2$/){&menu_url}
+        if ($select =~ /^3$/){&menu_DURL}
+        if ($select =~ /^4$/){&menu_durl}
+        if ($select =~ /^5$/){&menu_BASE64}
+        if ($select =~ /^6$/){&menu_base64}
+        if ($select =~ /^7$/){&menu_HTML}
+        if ($select =~ /^8$/){&menu_html}
+        if ($select =~ /^9$/){&menu_HEX}
+        if ($select =~ /10/){&menu_hex}
+        if ($select =~ /11/){&menu_INT}
+        if ($select =~ /12/){&menu_int}
+        if ($select =~ /13/){&menu_nint}
+        if ($select =~ /14/){&menu_NHEX}
+        if ($select =~ /15/){&menu_INTB}
+        if ($select =~ /16/){&menu_bint}
+        if ($select =~ /17/){&menu_FLOATH}
+        if ($select =~ /18/){&menu_hfloat}
+        if ($select =~ /19/){&menu_octh}
+        if ($select =~ /20/){&menu_HOCT}
+        if ($select =~ /21/){&menu_binh}
+        if ($select =~ /22/){&menu_hexb}
+        if ($select =~ /23/){&menu_SHA1}
+        if ($select =~ /24/){&menu_SHA224}
+        if ($select =~ /25/){&menu_SHA256}
+        if ($select =~ /26/){&menu_SHA384}
+        if ($select =~ /27/){&menu_SHA512}
+        if ($select =~ /28/){&menu_ROT13}
+        if ($select =~ /29/){&menu_rot13}
+        if ($select =~ /30/){&menu_md5}
+        if ($select =~ /31/){&menu_stack}
+        if ($select =~ /32/){&menu_rbin}
+        if ($select =~ /33/){&menu_wbin}
+        if ($select =~ /34/){&menu_net}
+        if ($select =~ /35/){&menu_NET}
+        if ($select =~ /99/){&menu_exit}
+        if ($select =~ /^q/){&menu_exit}
+        if ($select =~ /^e/){&menu_exit}
+        if ($select =~ /^x/){&menu_exit}
+        else {system ("$select");
+        	goto &main_menu;
+	}
+}
+
+sub menu_URL {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "URLencode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectURLfile = <STDIN>;
+	chomp ($selectURLfile);
+	$selectURLfile ||= "string";
+	if ($selectURLfile =~ m/^f/i) {
+		print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "URLencode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+		print BOLD() . "> " . RESET();
+		$file = <STDIN>;
+			## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+			$file =~ s{ ^ ~ ( [^/]* ) }
+				{ $1
+					? (getpwnam($1))[7]
+					: ( $ENV{HOME} || $ENV{LOGDIR}
+					|| (getpwuid($>))[7]
+					)
+				}ex;
+		chomp ($file);
+		if (! $file) {
+			print "\n";
+			goto &main_menu;
+		}
+		&filemenu;
+		&URLfile;
+		print "\nPress ENTER to continue...";
+		my $input = <STDIN>;
+		goto &main_menu;
+	} elsif ($selectURLfile =~ m/string/i) {
+		print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "URLencode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+		print BOLD() . "> " . RESET();
+		$ARGV[0] = <STDIN>;
+		chomp ($ARGV[0]);
+		if (! $ARGV[0]) {
+			print "\n";
+			goto &main_menu;
+		}
+		&URL;
+		print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+		goto &main_menu;
+	} else {
+		print "\n";
+		goto &main_menu;
+	}
+}
+
+sub menu_url {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "URLdecode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selecturlfile = <STDIN>;
+        chomp ($selecturlfile);
+        $selecturlfile ||= "string";
+        if ($selecturlfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "URLdecode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE(
+) . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &urlfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selecturlfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "URLdecode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &url;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_DURL {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "2xURLencode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectDURLfile = <STDIN>;
+        chomp ($selectDURLfile);
+        $selectDURLfile ||= "string";
+        if ($selectDURLfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "2xURLencode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &DURLfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectDURLfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "2xURLencode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &DURL;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+
+}
+
+sub menu_durl {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "2xURLdecode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectdurldfile = <STDIN>;
+        chomp ($selectdurldfile);
+        $selectdurldfile ||= "string";
+        if ($selectdurldfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "2xURLdecode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &durldfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectdurldfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "2xURLdecode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &durld;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_BASE64 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Base64encode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectBASE64file = <STDIN>;
+        chomp ($selectBASE64file);
+        $selectBASE64file ||= "string";
+        if ($selectBASE64file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Base64encode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &BASE64file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectBASE64file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Base64encode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &BASE64;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_base64 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Base64decode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectbase64file = <STDIN>;
+        chomp ($selectbase64file);
+        $selectbase64file ||= "string";
+        if ($selectbase64file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Base64decode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &base64file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectbase64file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Base64decode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &base64;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_HTML {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HTMLencode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectHTMLfile = <STDIN>;
+        chomp ($selectHTMLfile);
+        $selectHTMLfile ||= "string";
+        if ($selectHTMLfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HTMLencode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &HTMLfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectHTMLfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HTMLencode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &HTML;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_html {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HTMLdecode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selecthtmlfile = <STDIN>;
+        chomp ($selecthtmlfile);
+        $selecthtmlfile ||= "string";
+        if ($selecthtmlfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HTMLdecode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &htmlfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selecthtmlfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HTMLdecode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &html;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_HEX {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Ascii->HEX" . RESET();
+        print BOLD() . ">" . RESET() . " output in" . RESET() . " hexpair (" . BOLD() . "0f" . RESET() . ") or escaped format (" . BOLD() . "\\x0f" . RESET() . ")?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "hexpair" . RESET() . "|" . "escaped" . RESET() . "] ";
+	my $hexformat = <STDIN>;
+	chomp ($hexformat);
+	$hexformat ||= "hexpair";
+	if ($hexformat =~ m/^e/i) {
+		$opts{esc} = 1;
+	} elsif ($hexformat =~ m/^h/i) {
+		$opts{pair} = 1;
+	}
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Ascii->HEX" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectHEXfile = <STDIN>;
+        chomp ($selectHEXfile);
+        $selectHEXfile ||= "string";
+        if ($selectHEXfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Ascii->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &HEXfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectHEXfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "Ascii->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &HEX;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_hex {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->Ascii" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectxfile = <STDIN>;
+        chomp ($selectxfile);
+        $selectxfile ||= "string";
+        if ($selectxfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->Ascii" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &xfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectxfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->Ascii" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &x;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_INT {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->HEX" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectINTfile = <STDIN>;
+        chomp ($selectINTfile);
+        $selectINTfile ||= "string";
+        if ($selectINTfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &INTfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectINTfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &INT;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_int {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->INT" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectifile = <STDIN>;
+        chomp ($selectifile);
+        $selectifile ||= "string";
+        if ($selectifile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &ifile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectifile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &i;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_nint {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "-INT->HEX" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectnintfile = <STDIN>;
+        chomp ($selectnintfile);
+        $selectnintfile ||= "string";
+        if ($selectnintfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "-INT->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &nintfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectnintfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "-INT->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &nint;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_NHEX {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "-HEX->INT" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectNHEXfile = <STDIN>;
+        chomp ($selectNHEXfile);
+        $selectNHEXfile ||= "string";
+        if ($selectNHEXfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "-HEX->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &NHEXfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectNHEXfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "-HEX->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &NHEX;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_INTB {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->BIN" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectINTBfile = <STDIN>;
+        chomp ($selectINTBfile);
+        $selectINTBfile ||= "string";
+        if ($selectINTBfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->BIN" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &INTBfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectINTBfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->BIN" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &INTB;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_bint {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "BIN->INT" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectbintfile = <STDIN>;
+        chomp ($selectbintfile);
+        $selectbintfile ||= "string";
+        if ($selectbintfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "BIN->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &bintfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectbintfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "BIN->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &bint;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_FLOATH {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "FLOAT->HEX" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectFLOATHfile = <STDIN>;
+        chomp ($selectFLOATHfile);
+        $selectFLOATHfile ||= "string";
+        if ($selectFLOATHfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "FLOAT->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &FLOATHfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectFLOATHfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "FLOAT->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &FLOATH;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_hfloat {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->FLOAT" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selecthfloatfile = <STDIN>;
+        chomp ($selecthfloatfile);
+        $selecthfloatfile ||= "string";
+        if ($selecthfloatfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->FLOAT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &hfloatfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selecthfloatfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->FLOAT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &hfloat;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_octh {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "OCTAL->HEX" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectocthfile = <STDIN>;
+        chomp ($selectocthfile);
+        $selectocthfile ||= "string";
+        if ($selectocthfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "OCTAL->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &octhfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectocthfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "OCTAL->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &octh;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_HOCT {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->OCTAL" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectHOCTfile = <STDIN>;
+        chomp ($selectHOCTfile);
+        $selectHOCTfile ||= "string";
+        if ($selectHOCTfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->OCTAL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &HOCTfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectHOCTfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->OCTAL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &HOCT;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_binh {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "BIN->HEX" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectbinhfile = <STDIN>;
+        chomp ($selectbinhfile);
+        $selectbinhfile ||= "string";
+        if ($selectbinhfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "BIN->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &binhfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectbinhfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "BIN->HEX" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &binh;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_hexb {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->BIN" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selecthexbfile = <STDIN>;
+        chomp ($selecthexbfile);
+        $selecthexbfile ||= "string";
+        if ($selecthexbfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->BIN" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &hexbfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selecthexbfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEX->BIN" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &hexb;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_SHA1 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA1" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectSHA1file = <STDIN>;
+        chomp ($selectSHA1file);
+        $selectSHA1file ||= "string";
+        if ($selectSHA1file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA1" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &sha1file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectSHA1file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA1" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &sha1;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_SHA224 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA224" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectSHA224file = <STDIN>;
+        chomp ($selectSHA224file);
+        $selectSHA224file ||= "string";
+        if ($selectSHA224file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA224" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &sha224file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectSHA224file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA224" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &sha224;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_SHA256 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA256" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectSHA256file = <STDIN>;
+        chomp ($selectSHA256file);
+        $selectSHA256file ||= "string";
+        if ($selectSHA256file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA256" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &sha256file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectSHA256file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA256" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &sha256;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_SHA384 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA384" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectSHA384file = <STDIN>;
+        chomp ($selectSHA384file);
+        $selectSHA384file ||= "string";
+        if ($selectSHA384file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA384" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &sha384file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectSHA384file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA384" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &sha384;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_SHA512 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA512" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectSHA512file = <STDIN>;
+        chomp ($selectSHA512file);
+        $selectSHA512file ||= "string";
+        if ($selectSHA512file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA512" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &sha512file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectSHA512file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "SHA512" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &sha512;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_ROT13 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ROT13encode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectROT13file = <STDIN>;
+        chomp ($selectROT13file);
+        $selectROT13file ||= "string";
+        if ($selectROT13file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ROT13encode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &rotate13file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectROT13file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ROT13encode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &rotate13;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_rot13 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ROT13decode" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectrot13file = <STDIN>;
+        chomp ($selectrot13file);
+        $selectrot13file ||= "string";
+        if ($selectrot13file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ROT13decode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &unrotate13file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectrot13file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ROT13decode" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &unrotate13;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_md5 {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "MD5" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectmd5file = <STDIN>;
+        chomp ($selectmd5file);
+        $selectmd5file ||= "string";
+        if ($selectmd5file =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "MD5" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &md5file;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectmd5file =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "MD5" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &md5;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_stack {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string2stack" . RESET();
+        print BOLD() . ">" . RESET() . " output in" . RESET() . " escaped (" . BOLD() . "\\x0f" . RESET() . "), hexpair (" . BOLD() . "0f" . RESET() . "), or ansiC format (" . BOLD() . "0x0f" . RESET() . ")?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "escaped" . RESET() . "|" . "hexpair" . RESET() . "|ansiC] ";
+        my $hexformat = <STDIN>;
+        chomp ($hexformat);
+        $hexformat ||= "escaped";
+        if ($hexformat =~ m/^e/i) {
+                $opts{esc} = 1;
+        } elsif ($hexformat =~ m/^h/i) {
+                $opts{pair} = 1;
+        } elsif ($hexformat =~ m/^a/i) {
+		$opts{ansiC} = 1;
+	}
+
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string2stack" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectstackfile = <STDIN>;
+        chomp ($selectstackfile);
+        $selectstackfile ||= "string";
+        if ($selectstackfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string2stack" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &string2stackfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectstackfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string2stack" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &string2stack;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_rbin {
+	print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "ReadBin" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+        print BOLD() . "> " . RESET();
+        $file = <STDIN>;
+       		## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+        	$file =~ s{ ^ ~ ( [^/]* ) }
+      			{ $1
+                		? (getpwnam($1))[7]
+                		: ( $ENV{HOME} || $ENV{LOGDIR}
+                		|| (getpwuid($>))[7]
+                		)
+                	}ex;
+        chomp ($file);
+        if (! $file) {
+		print "\n";
+                goto &main_menu;
+        }
+        &filemenu;
+        &readbinfunc;
+        print "\nPress ENTER to continue...";
+        my $input = <STDIN>;
+        goto &main_menu;
+}
+
+sub menu_wbin {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "WriteBin" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . BOLD() . "INPUT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+        print BOLD() . "> " . RESET();
+        $file = <STDIN>;
+     		## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+        	$file =~ s{ ^ ~ ( [^/]* ) }
+        		{ $1
+                        	? (getpwnam($1))[7]
+                                : ( $ENV{HOME} || $ENV{LOGDIR}
+                                || (getpwuid($>))[7]
+                                )
+                       	}ex;
+	chomp ($file);
+        if (! $file) {
+        	print "\n";
+                goto &main_menu;
+        }
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "WriteBin" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . BOLD() . "OUTPUT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+	print BOLD() . "> " . RESET();
+	$ARGV[0] = <STDIN>;
+                ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                $ARGV[0] =~ s{ ^ ~ ( [^/]* ) }
+                        { $1
+                                ? (getpwnam($1))[7]
+                                : ( $ENV{HOME} || $ENV{LOGDIR}
+                                || (getpwuid($>))[7]
+                                )
+                        }ex;
+        chomp ($ARGV[0]);
+        if (! $ARGV[0]) {
+                print "\n";
+                goto &main_menu;
+        }
+        &filemenu;
+        &writebinfunc;
+        print "\nPress ENTER to continue...";
+        my $input = <STDIN>;
+        goto &main_menu;
+}
+
+sub menu_net {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->HEXnetwork" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectnetfile = <STDIN>;
+        chomp ($selectnetfile);
+        $selectnetfile ||= "string";
+        if ($selectnetfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->HEXnetwork" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &netfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectnetfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "INT->HEXnetwork" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &net;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_NET {
+        print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEXnetwork->INT" . RESET();
+        print BOLD() . "> string" . RESET() . " or file?" . BOLD() . " :: " . RESET() . "[" . BOLD() . "string" . RESET() . "] ";
+        my $selectNETfile = <STDIN>;
+        chomp ($selectNETfile);
+        $selectNETfile ||= "string";
+        if ($selectNETfile =~ m/^f/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEXnetwork->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "filename" . RESET();
+                print BOLD() . "> " . RESET();
+                $file = <STDIN>;
+                        ## expands tilde in filename -- O'Reilly's Perl Cookbook, Recipe #7.3
+                        $file =~ s{ ^ ~ ( [^/]* ) }
+                                { $1
+                                        ? (getpwnam($1))[7]
+                                        : ( $ENV{HOME} || $ENV{LOGDIR}
+                                        || (getpwuid($>))[7]
+                                        )
+                                }ex;
+                chomp ($file);
+                if (! $file) {
+                        print "\n";
+                        goto &main_menu;
+                }
+                &filemenu;
+                &NETfile;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } elsif ($selectNETfile =~ m/string/i) {
+                print CYAN() . UNDERLINE() . "hURL" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "HEXnetwork->INT" . RESET() . UNDERLINE() . ":" . CYAN() . UNDERLINE() . "string" . RESET();
+                print BOLD() . "> " . RESET();
+                $ARGV[0] = <STDIN>;
+                chomp ($ARGV[0]);
+                if (! $ARGV[0]) {
+                       print "\n";
+                       goto &main_menu;
+                }
+                &NET;
+                print "\nPress ENTER to continue...";
+                my $input = <STDIN>;
+                goto &main_menu;
+        } else {
+                print "\n";
+                goto &main_menu;
+        }
+}
+
+sub menu_exit {
+        print "\n";
+        print BOLD() . "[" . CYAN() . "*" . RESET() . BOLD() . "]  Thanks for using " . "hURL" . RESET() . "\n";
+        print BOLD() . "[" . CYAN() . "*" . RESET() . BOLD() . "]  Have an epic day =)\n";
+	exit(0);
+}
+
+sub filemenu {
+                local $/;       # same as 'local undef $/;' enables "slurp mode" to read entire file
+                $myFile = $file;
+                open(INPUTFILE, "$myFile") or print BOLD() . "\n[" . RED() . "*" . RESET() . BOLD() . "]  " . RED() . "Error opening file: " . RESET() . BOLD() . "$myFile\n\n" . RESET();
+		if (! open (INPUTFILE, "$myFile")) {
+			goto &main_menu;
+		}
+                while (<INPUTFILE>) {
+                        chomp $_;
+                        $line = $_;
+                        last if $line eq "done";
+                        $string = $_;
+                        $string =~ s/\R*$//;    # removes last linebreak/newline
+		}
+		close (INPUTFILE);
+}
+
+sub corelan {
+
+my $asciitable = " Dec Hex Chr  Dec Hex Chr  Dec Hex Chr  Dec Hex Chr  Dec Hex Chr  Dec Hex Chr  Dec Hex Chr  Dec Hex Chr\n".
+"  0  00 ".BOLD()." NUL".RESET()."  16  10 ".BOLD()." DLE".RESET()."  32  20       48  30  ".BOLD()."0".RESET()."    64  40  ".BOLD()."@".RESET()."    80  50  ".BOLD()."P".RESET()."    96  60  ".BOLD()."`".RESET()."    112 70  ".BOLD()."p".RESET()."\n".
+"  1  01 ".BOLD()." SOH".RESET()."  17  11 ".BOLD()." DC1".RESET()."  33  21  ".BOLD()."!".RESET()."    49  31  ".BOLD()."1".RESET()."    65  41  ".BOLD()."A".RESET()."    81  51  ".BOLD()."Q".RESET()."    97  61  ".BOLD()."a".RESET()."    113 71  ".BOLD()."q".RESET()."\n".
+"  2  02 ".BOLD()." STX".RESET()."  18  12 ".BOLD()." DC2".RESET()."  34  22  ".BOLD()."\"".RESET()."    50  32  ".BOLD()."2".RESET()."    66  42  ".BOLD()."B".RESET()."    82  52  ".BOLD()."R".RESET()."    98  62  ".BOLD()."b".RESET()."    114 72  ".BOLD()."r".RESET()."\n".
+"  3  03 ".BOLD()." ETX".RESET()."  19  13 ".BOLD()." DC3".RESET()."  35  23  ".BOLD()."#".RESET()."    51  33  ".BOLD()."3".RESET()."    67  43  ".BOLD()."C".RESET()."    83  53  ".BOLD()."S".RESET()."    99  63  ".BOLD()."c".RESET()."    115 73  ".BOLD()."s".RESET()."\n".
+"  4  04 ".BOLD()." EOT".RESET()."  20  14 ".BOLD()." DC4".RESET()."  36  24  ".BOLD()."\$".RESET()."    52  34  ".BOLD()."4".RESET()."    68  44  ".BOLD()."D".RESET()."    84  54  ".BOLD()."T".RESET()."    100 64  ".BOLD()."d".RESET()."    116 74  ".BOLD()."t".RESET()."\n".
+"  5  05 ".BOLD()." ENQ".RESET()."  21  15 ".BOLD()." NAK".RESET()."  37  25  ".BOLD()."\%".RESET()."    53  35  ".BOLD()."5".RESET()."    69  45  ".BOLD()."E".RESET()."    85  55  ".BOLD()."U".RESET()."    101 65  ".BOLD()."e".RESET()."    117 75  ".BOLD()."u".RESET()."\n".
+"  6  06 ".BOLD()." ACK".RESET()."  22  16 ".BOLD()." SYN".RESET()."  38  26  ".BOLD()."&".RESET()."    54  36  ".BOLD()."6".RESET()."    70  46  ".BOLD()."F".RESET()."    86  56  ".BOLD()."V".RESET()."    102 66  ".BOLD()."f".RESET()."    118 76  ".BOLD()."v".RESET()."\n".
+"  7  07 ".BOLD()." BEL".RESET()."  23  17 ".BOLD()." ETB".RESET()."  39  27  ".BOLD()."'".RESET()."    55  37  ".BOLD()."7".RESET()."    71  47  ".BOLD()."G".RESET()."    87  57  ".BOLD()."W".RESET()."    103 67  ".BOLD()."g".RESET()."    119 77  ".BOLD()."w".RESET()."\n".
+"  8  08 ".BOLD()." BS".RESET()."   24  18 ".BOLD()." CAN".RESET()."  40  28  ".BOLD()."(".RESET()."    56  38  ".BOLD()."8".RESET()."    72  48  ".BOLD()."H".RESET()."    88  58  ".BOLD()."X".RESET()."    104 68  ".BOLD()."h".RESET()."    120 78  ".BOLD()."x".RESET()."\n".
+"  9  09 ".BOLD()." HT".RESET()."   25  19 ".BOLD()." EM".RESET()."   41  29  ".BOLD().")".RESET()."    57  39  ".BOLD()."9".RESET()."    73  49  ".BOLD()."I".RESET()."    89  59  ".BOLD()."Y".RESET()."    105 69  ".BOLD()."i".RESET()."    121 79  ".BOLD()."y".RESET()."\n".
+" 10  0A ".BOLD()." LF".RESET()."   26  1A ".BOLD()." SUB".RESET()."  42  2A  ".BOLD()."*".RESET()."    58  3A  ".BOLD().":".RESET()."    74  4A  ".BOLD()."J".RESET()."    90  5A  ".BOLD()."Z".RESET()."    106 6A  ".BOLD()."j".RESET()."    122 7A  ".BOLD()."z".RESET()."\n".
+" 11  0B ".BOLD()." VT".RESET()."   27  1B ".BOLD()." ESC".RESET()."  43  2B  ".BOLD()."+".RESET()."    59  3B  ".BOLD().";".RESET()."    75  4B  ".BOLD()."K".RESET()."    91  5B  ".BOLD()."[".RESET()."    107 6B  ".BOLD()."k".RESET()."    123 7B  ".BOLD()."{".RESET()."\n".
+" 12  0C ".BOLD()." FF".RESET()."   28  1C ".BOLD()." FS".RESET()."   44  2C  ".BOLD().",".RESET()."    60  3C  ".BOLD()."<".RESET()."    76  4C  ".BOLD()."L".RESET()."    92  5C  ".BOLD()."\\".RESET()."    108 6C  ".BOLD()."l".RESET()."    124 7C  ".BOLD()."|".RESET()."\n".
+" 13  0D ".BOLD()." CR".RESET()."   29  1D ".BOLD()." GS".RESET()."   45  2D  ".BOLD()."-".RESET()."    61  3D  ".BOLD()."=".RESET()."    77  4D  ".BOLD()."M".RESET()."    93  5D  ".BOLD()."]".RESET()."    109 6D  ".BOLD()."m".RESET()."    125 7D  ".BOLD()."}".RESET()."\n".
+" 14  0E ".BOLD()." SO".RESET()."   30  1E ".BOLD()." RS".RESET()."   46  2E  ".BOLD().".".RESET()."    62  3E  ".BOLD().">".RESET()."    78  4E  ".BOLD()."N".RESET()."    94  5E  ".BOLD()."^".RESET()."    110 6E  ".BOLD()."n".RESET()."    126 7E  ".BOLD()."~".RESET()."\n".
+" 15  0F ".BOLD()." SI".RESET()."   31  1F ".BOLD()." US".RESET()."   47  2F  ".BOLD()."/".RESET()."    63  3F  ".BOLD()."?".RESET()."    79  4F  ".BOLD()."O".RESET()."    95  5F  ".BOLD()."_".RESET()."    111 6F  ".BOLD()."o".RESET()."    127 7F  ".BOLD()."DEL".RESET()."\n";
+
+print BOLD()."--[ ASCII Table ]--\n".RESET().$asciitable."\n";
+
+my $registersX86 = " (E|R)AX : return value, calculations  | (E|R)SP : top of stack\n".
+		   " (E|R)CX : loopcounter, params         | (E|R)BP : frame pointer\n".
+		   " (E|R)DX : params, data, math          | (E|R)SI : source\n".
+		   " (E|R)BX : generic                     | (E|R)DI : destination\n".
+		   " (E|R)IP : instruction pointer\n";
+print BOLD()."--[ Registers ]--\n".RESET().$registersX86."\n";
+
+my $commonAsm = " jmp eax  FF E0 | call eax  FF D0\n".
+" jmp ebx  FF E3 | call ebx  FF D3\n".
+" jmp ecx  FF E1 | call ecx  FF D1\n".
+" jmp edx  FF E2 | call edx  FF D2\n".
+" jmp edi  FF E7 | call edi  FF D7\n".
+" jmp esi  FF E6 | call esi  FF D6\n".
+" jmp esp  FF E4 | call esp  FF D4\n".
+" jmp ebp  FF E5 | call ebp  FF D5\n".
+" pop eax  58 | push eax  50\n".
+" pop ebx  5B | push ebx  53\n".
+" pop ecx  59 | push ecx  51\n".
+" pop edx  5A | push edx  52\n".
+" pop edi  5F | push edi  57\n".
+" pop esi  5E | push esi  56\n".
+" pop esp  5C | push esp  54\n".
+" pop ebp  5D | push ebp  55\n".
+" ret C3 | ret+offset C2\n";
+print BOLD()."--[ Common asm/opcodes (x86_64 = substitute E##{EAX} with R##{RAX}) ]--\n".RESET().$commonAsm."\n";
+
+my $condjmpShort = " Code 	Mnemonic 	Description\n".
+" 77 cb 	JA rel8 	Jump short if above (CF=0 and ZF=0)\n".
+" 73 cb 	JAE rel8 	Jump short if above or equal (CF=0)\n".
+" 72 cb 	JB rel8 	Jump short if below (CF=1)\n".
+" 76 cb 	JBE rel8 	Jump short if below or equal (CF=1 or ZF=1)\n".
+" 72 cb 	JC rel8 	Jump short if carry (CF=1)\n".
+" E3 cb 	JCXZ rel8 	Jump short if CX register is 0\n".
+" E3 cb 	JECXZ rel8 	Jump short if ECX register is 0\n".
+" 74 cb 	JE rel8 	Jump short if equal (ZF=1)\n".
+" 7F cb 	JG rel8 	Jump short if greater (ZF=0 and SF=OF)\n".
+" 7D cb 	JGE rel8 	Jump short if greater or equal (SF=OF)\n".
+" 7C cb 	JL rel8 	Jump short if less (SF<>OF)\n".
+" 7E cb 	JLE rel8 	Jump short if less or equal (ZF=1 or SF<>OF)\n".
+" 76 cb 	JNA rel8 	Jump short if not above (CF=1 or ZF=1)\n".
+" 72 cb 	JNAE rel8 	Jump short if not above or equal (CF=1)\n".
+" 73 cb 	JNB rel8 	Jump short if not below (CF=0)\n".
+" 77 cb 	JNBE rel8 	Jump short if not below or equal (CF=0 and ZF=0)\n".
+" 73 cb 	JNC rel8 	Jump short if not carry (CF=0)\n".
+" 75 cb 	JNE rel8 	Jump short if not equal (ZF=0)\n".
+" 7E cb 	JNG rel8 	Jump short if not greater (ZF=1 or SF<>OF)\n".
+" 7C cb 	JNGE rel8 	Jump short if not greater or equal (SF<>OF)\n".
+" 7D cb 	JNL rel8 	Jump short if not less (SF=OF)\n".
+" 7F cb 	JNLE rel8 	Jump short if not less or equal (ZF=0 and SF=OF)\n".
+" 71 cb 	JNO rel8 	Jump short if not overflow (OF=0)\n".
+" 7B cb 	JNP rel8 	Jump short if not parity (PF=0)\n".
+" 79 cb 	JNS rel8 	Jump short if not sign (SF=0)\n".
+" 75 cb 	JNZ rel8 	Jump short if not zero (ZF=0)\n".
+" 70 cb 	JO rel8 	Jump short if overflow (OF=1)\n".
+" 7A cb 	JP rel8 	Jump short if parity (PF=1)\n".
+" 7A cb 	JPE rel8 	Jump short if parity even (PF=1)\n".
+" 7B cb 	JPO rel8 	Jump short if parity odd (PF=0)\n".
+" 78 cb 	JS rel8 	Jump short if sign (SF=1)\n".
+" 74 cb 	JZ rel8 	Jump short if zero (ZF = 1)\n";
+print BOLD()."--[ Conditional jumps - short ]--\n".RESET().$condjmpShort."\n";
+
+my $condjmpNear = " Code   	Mnemonic        Description\n".
+" 0F 87 cw/cd 	JA rel16/32 	Jump near if above (CF=0 and ZF=0)\n".
+" 0F 83 cw/cd 	JAE rel16/32 	Jump near if above or equal (CF=0)\n".
+" 0F 82 cw/cd 	JB rel16/32 	Jump near if below (CF=1)\n".
+" 0F 86 cw/cd 	JBE rel16/32 	Jump near if below or equal (CF=1 or ZF=1)\n".
+" 0F 82 cw/cd 	JC rel16/32 	Jump near if carry (CF=1)\n".
+" 0F 84 cw/cd 	JE rel16/32 	Jump near if equal (ZF=1)\n".
+" 0F 84 cw/cd 	JZ rel16/32 	Jump near if 0 (ZF=1)\n".
+" 0F 8F cw/cd 	JG rel16/32 	Jump near if greater (ZF=0 and SF=OF)\n".
+" 0F 8D cw/cd 	JGE rel16/32 	Jump near if greater or equal (SF=OF)\n".
+" 0F 8C cw/cd 	JL rel16/32 	Jump near if less (SF<>OF)\n".
+" 0F 8E cw/cd 	JLE rel16/32 	Jump near if less or equal (ZF=1 or SF<>OF)\n".
+" 0F 86 cw/cd 	JNA rel16/32 	Jump near if not above (CF=1 or ZF=1)\n".
+" 0F 82 cw/cd 	JNAE rel16/32 	Jump near if not above or equal (CF=1)\n".
+" 0F 83 cw/cd 	JNB rel16/32 	Jump near if not below (CF=0)\n".
+" 0F 87 cw/cd 	JNBE rel16/32 	Jump near if not below or equal (CF=0 and ZF=0)\n".
+" 0F 83 cw/cd 	JNC rel16/32 	Jump near if not carry (CF=0)\n".
+" 0F 85 cw/cd 	JNE rel16/32 	Jump near if not equal (ZF=0)\n".
+" 0F 8E cw/cd 	JNG rel16/32 	Jump near if not greater (ZF=1 or SF<>OF)\n".
+" 0F 8C cw/cd 	JNGE rel16/32 	Jump near if not greater or equal (SF<>OF)\n".
+" 0F 8D cw/cd 	JNL rel16/32 	Jump near if not less (SF=OF)\n".
+" 0F 8F cw/cd 	JNLE rel16/32 	Jump near if not less or equal (ZF=0 and SF=OF)\n".
+" 0F 81 cw/cd 	JNO rel16/32 	Jump near if not overflow (OF=0)\n".
+" 0F 8B cw/cd 	JNP rel16/32 	Jump near if not parity (PF=0)\n".
+" 0F 89 cw/cd 	JNS rel16/32 	Jump near if not sign (SF=0)\n".
+" 0F 85 cw/cd 	JNZ rel16/32 	Jump near if not zero (ZF=0)\n".
+" 0F 80 cw/cd 	JO rel16/32 	Jump near if overflow (OF=1)\n".
+" 0F 8A cw/cd 	JP rel16/32 	Jump near if parity (PF=1)\n".
+" 0F 8A cw/cd 	JPE rel16/32 	Jump near if parity even (PF=1)\n".
+" 0F 8B cw/cd 	JPO rel16/32 	Jump near if parity odd (PF=0)\n".
+" 0F 88 cw/cd 	JS rel16/32 	Jump near if sign (SF=1)\n".
+" 0F 84 cw/cd 	JZ rel16/32 	Jump near if 0 (ZF=1)\n";
+print BOLD()."--[ Conditional jumps - near ]--\n".RESET().$condjmpNear."\n";
+
+my $ropPivot = " add esp,offset + ret\n".
+" xchg reg,esp + ret\n".
+" xchg esp,reg + ret\n".
+" push reg, pop esp + ret\n".
+" mov esp,reg + ret\n".
+" call [reg]\n".
+" mov reg,[ebp+0c] + call [reg] (ref to seh)\n".
+" mov reg, dword ptr fs:[0] + ... + ret\n";
+print BOLD()."--[ ROP Stack Pivot ]--\n".RESET().$ropPivot."\n";
+
+my $nopSledTable = " \\x90 nop | \\x91 | \\x92 | \\x93 | \\x95 | \\x96 | \\x97 \\x9b\n".
+		   " \\x41 inc eax (A) | \\x42 inc edx (B) | \\x43 inc ebx (C)\n".
+		   " \\x44 inc esp (D) | \\x45 inc ebp (E) | \\x46 inc esi (F)\n".
+		   " \\x47 inc edi (G) | \\x48 dec eax (H) | \\x49 dec ecx (I)\n".
+		   " \\x4a dec edx (J) | \\x4b dec ebx (K) | \\x4c dec esp (L)\n".
+		   " \\x4d dec ebp (M) | \\x4e dec esi (N) | \\x4f dec edi (O)\n".
+		   " push/pop    \\x50\\x58 (eax) | \\x51\\x59 (ecx) | \\x52\\x5a (edx)\n".
+		   "             \\x53\\x5b (ebx) | \\x54\\x5c (esp) | \\x55\\x5d (ebp)\n".
+		   "             \\x56\\x5e (esi) | \\x57\\x5f (edi) | \\x60\\x61 (all)\n".
+		   " \\x0a\\x0a | \\x0c\\x0c | \\x0d\\x0d | \\x0d\\x0c\\x0d\\x0c\\x0d | \\x0c\\x??\n";
+print BOLD()."--[ NOP Sled Table ]--\n".RESET().$nopSledTable."\n";
+
+my $unicodeNOPpad = " (-> \\x00\\x..\\x00. Register = write to [target])\n".
+		    "  EAX   EBX   ECX   EDX   EBP   ESI   EDI\n".
+		    " \\x40  \\x43  \\x41  \\x42  \\x45  \\x46  \\x47\n".
+		    " \\x48  \\x4b  \\x49  \\x4a  \\x4d  \\x4e  \\x4f\n".
+		    " \\x50  \\x53  \\x51  \\x52  \\x55  \\x56  \\x57\n".
+		    " \\x58  \\x5b  \\x59  \\x5a  \\x5d  \\x5e  \\x5f\n".
+		    " \\x60  \\x63  \\x61  \\x62  \\x65  \\x66  \\x67\n".
+		    " \\x68  \\x6b  \\x69  \\x6a  \\x6d  \\x6e  \\x6f\n".
+		    " \\x70  \\x73  \\x71  \\x72  \\x75  \\x76  \\x77\n".
+		    " \\x78  \\x7b  \\x79  \\x7a  \\x7d  \\x7e  \\x7f\n";
+print BOLD()."--[ Unicode NOP / padding ]--\n".RESET().$unicodeNOPpad."\n";
+
+my $monaEgghunter = " Egghunter, " . BOLD() . "tag " . RED() . "w00t" . RESET() . " :\n".
+		    "  \"\\x66\\x81\\xca\\xff\\x0f\\x42\\x52\\x6a\\x02\\x58\\xcd\\x2e\\x3c\\x05\\x5a\\x74\" +\n".
+		    "  \"\\xef\\xb8\" + " . BOLD() . RED() . "\"\\x77\\x30\\x30\\x74\"" . RESET() . " + \"\\x8b\\xfa\\xaf\\x75\\xea\\xaf\\x75\\xe7\\xff\\xe7\"\n".
+		    BOLD() . "   Put this tag in front of your shellcode" . CYAN() . " : w00tw00t\n" . RESET() .
+		    "\n".
+		    "Opcodes + description for basic version of egghunter ::\n".
+				"\t\"\\x66\\x81\\xca\\xff\\x0f\"+ \t# OR DX,0xFFF\n".
+				"\t\"\\x42\"+		          \t# INC EDX\n".
+				"\t\"\\x52\"+			  \t# PUSH EDX\n".
+				"\t\"\\x6a\\x02\"+		  \t# PUSH 2 (NtAccessCheckAndAuditAlarm syscall)\n".
+				"\t\"\\x58\"+			  \t# POP EAX\n".
+				"\t\"\\xcd\\x2e\"+		  \t# INT 0x2E \n".
+				"\t\"\\x3c\\x05\"+		  \t# CMP AL,5\n".
+				"\t\"\\x5a\"+			  \t# POP EDX\n".
+				"\t\"\\x74\\xef\"+		  \t# JE \"OR DX,0xFFF\"\n".
+				"\t\"\\xb8\"+ " . BOLD() . RED() . "EGG" . RESET() . " +		  \t# MOV EAX, " . BOLD() . RED() . "EGG\n" . RESET() .
+				"\t\"\\x8b\\xfa\"+		  \t# MOV EDI,EDX\n".
+				"\t\"\\xaf\"+			  \t# SCASD\n".
+				"\t\"\\x75\\xea\"+		  \t# JNE \"INC EDX\"\n".
+				"\t\"\\xaf\"+			  \t# SCASD\n".
+				"\t\"\\x75\\xe7\"+		  \t# JNE \"INC EDX\"\n".
+		    		"\t\"\\xff\\xe7\"		  \t# JMP EDI (jumps to first byte of code/payload)\n";
+print BOLD()."--[ Mona.py Egghunter ]--\n".RESET().$monaEgghunter."\n";
+
+my $getPC = "GetPC (get Program Counter, also known as GetEIP on x86) code determines its own location in a process' address space.\n".
+	    "\n".
+	    BOLD() . ".:[ CALL \$+4 GetPC (7byte NULL-free) ]:.\n" . RESET() .
+	    "  \\xE8\\xFF\\xFF\\xFF\\xFF \t\tCALL \$+4\n".
+	    "  \\xC3    \t\t\tRET\n".
+	    "  \\x59    \t\t\tPOP ECX\n".
+	    "\n".
+	    BOLD() . " << When the code executes, the CALL will jump to the last byte of the call instruction itself, and will work as follows: >>\n" . RESET() .
+	    "      \$+0:    E8 FFFFFF     CALL \$+4          ; PUSH \$+5 onto the stack and jump to \$+4 (which is the last \\xFF)\n".
+	    "      \$+4:    FF C3         INC  EBX          ; Does nothing useful; can be considered a NOP\n".
+	    "      \$+6:    59            POP  ECX          ; ECX = \$+5\n".
+	    "      \$+7:    " . BOLD() . "...shellcode...\n" . RESET() .
+	    "\n".
+	    BOLD() . ".:[ FSTENV GetPC (7byte NULL-free) ]:.\n" . RESET() .
+	    " A way to retrieve EIP on x86 is to use the x87 FSTENV opcode to store the state of the x87 floating point chip after issuing\n".
+	    " the FLDZ opcode. FSTENV will then contain the address of the FLDZ instruction at offset 0x0C: \n".
+	    "  \\xD9\\xEE  \t\t\tFLDZ\n".
+	    "  \\xD9\\x74\\x24\\xF4  \t\tFSTENV PTR SS:[ESP-0xC]\n".
+	    "  \\x59       \t\t\tPOP ECX\n".
+	    "\n".
+	    BOLD() . " << Explanation of code: >>\n" . RESET() .
+	    "      \$+0     D9EE          FLDZ                    ; Floating point stores \$+0 in its environment\n".
+	    "      \$+2     D97424 F4     FSTENV PTR SS:[ESP-0xC] ; Save environment at ESP-0xC; now [ESP] = \$+0\n".
+	    "      \$+6     59            POP ECX                 ; ECX = \$+0\n".
+	    "\n".
+	    " REFERENCE: https://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC\n".
+	    "            https://www.corelan.be/index.php/2010/02/25/exploit-writing-tutorial-part-9-introduction-to-win32-shellcoding/\n";
+print BOLD()."--[ GetPC/GetEIP ]--\n".RESET().$getPC."\n";
+
+
+my $shellCodes = " \"... if EIP and ESP are too close to each other (which is very common if the\n".
+		" shellcode is on the stack), then NOPs are a good way to prevent corruption.\n".
+		" ... a simple stackadjust instruction might do the trick as well.\n".
+		" Simply prepend the shellcode with the opcode bytes (for example, add esp,-450).\n".
+		" The Metasploit assembler may be used to provide the required\n".
+		" instructions in hex:\"\n".
+		"\n".
+		"\troot\@bt:/pentest/exploits/framework3/tools# " . BOLD() . "./metasm_shell.rb\n" . RESET() .
+		"\ttype \"exit\" or \"quit\" to quit\\n".
+		"\tuse \";\" or \"\\n\" for newline\n".
+		"\tmetasm > " . BOLD() . "add esp,-450\n" . RESET() .
+		"\t\\x81\\xc4\\x3e\\xfe\\xff\\xff\n".
+		"\tmetasm >\n".
+		"\n".
+		"  ^^^ Gray Hat Hacking - The Ethical Hackers Handbook - p313, Chapter 15: Windows Exploits ^^^\n".
+		 "\n";
+print BOLD()."--[ Shellcode Hints/Resources ]--\n".RESET().$shellCodes."\n";
+
+my $whereIsCorelan = " https://www.corelan.be\n".
+		     " https://redmine.corelan.be/projects/corelanart/\n".
+		     " IRC: #corelan (freenode)\n".
+		     "    (c) corelanc0d3r\n";
+print BOLD()."--[ CORELAN ]--\n".RESET().$whereIsCorelan."\n";
+}
+
 __DATA__
 =head1 NAME
 
   .::[ hURL - hexadecimal & URL (en/de)coder v2.1 ]::.
 
-=head1 SYNOPSIS
-
-  hURL [-options|--options] [string|-f <filename>]
-
-F
-F
-=head1 ARGUMENTS
-
-
-  ARGZ  
-	E<number>	 ASCII character code
-
-	Recent versions of Getopt::Long provide the HelpMessage and VersionMessage subroutines.
-	HelpMessage is essentially a wrapper around pod2usage, while VersionMessage emulates pod2usage syn-
-	tax and options, but it is fully contained within Getopt::Long. See Chapter 14 for more information.
-
-
-	Pod::Text::Color		Convert POD to text using ANSI color sequences. The basis of the
-					-color option to pod2text. Subclassed from Pod::Text. This uses
-					Term::ANSIColor, which must be installed (see Chapter 15).
-
-E<61>shabbaE<99>
-C<red>shabba123
-
-	/usr/share/perl5/core_perl/Pod/Text/Color.pm
-		..=head1.. level one headings bold
-		..=head2.. level two headings bold
-		sub cmd_b { return colored ($_[2], 'bold')   }
-		sub cmd_f { return colored ($_[2], 'cyan')   }
-		sub cmd_i { return colored ($_[2], 'yellow') }
-		# Output any included code in green.
-
-	/usr/share/perl5/core_perl/Term/ANSIColor.pm
-	        CLEAR         . RESET() .           BOLD()            DARK
-	        FAINT           UNDERLINE         UNDERSCORE      BLINK
-	        REVERSE         CONCEALED
-
-        	BLACK           RED               GREEN           YELLOW
-	        BLUE            MAGENTA           CYAN            WHITE
-	        ON_BLACK        ON_RED            ON_GREEN        ON_YELLOW
-	        ON_BLUE         ON_MAGENTA        ON_CYAN         ON_WHITE
-
-        	BRIGHT_BLACK    BRIGHT_RED        BRIGHT_GREEN    BRIGHT_YELLOW
-       		BRIGHT_BLUE     BRIGHT_MAGENTA    BRIGHT_CYAN     BRIGHT_WHITE
-        	ON_BRIGHT_BLACK ON_BRIGHT_RED     ON_BRIGHT_GREEN ON_BRIGHT_YELLOW
-        	ON_BRIGHT_BLUE  ON_BRIGHT_MAGENTA ON_BRIGHT_CYAN  ON_BRIGHT_WHITE
-
-
-
-	* FILES get processed before $ARGV[0] no matter what
-		-U "hello world" -f <file1> -f <file2>
-		-U -f <file1> -f <file2> "hello world"
-	* MULTIPLE files can be specified on the command-line (-f+ or using ,)
-		-f <file1> -f <file2>
-		-f <file1>,<file2>,<file3>
-
-	>>> rasc -h
-	Usage: rasc [-cCexXtLV] [-l port] [-a addr@off] [-[A|N|C|E] N]
-	            [-s hexpair] [-i name] [-S file] [-h]
-	  -l [port]    starts a syscall proxy server
-	  -A [n]       prefix shellcode with N A's (0x41)
-	  -N [n]       prefix shellcode with N nops (0x90)
-	  -C [n]       suffix shellcode with N traps
-	  -E [n]       prefix with enumeration 01 02 03..
-	  -a addr@off  set the return address at a specified offset
-	  -s 'sc'      set shellcode in hexpairs (cc cd 80)
-	  -S 'file'    load shellcode from file
-	  -i 'scdb'    hardcoded shellcode (-L to list)
-	  -L           list hardcoded shellcodes
-	  -c           output in C format
-	  -e           output in escapped string
-	  -x           output in hexpairs format
-	  -X           execute shellcode
-	  -t           test current platform
-	  -V           show version information
-	 Environment variables to compile shellcodes:
-	  CMD          Command to execute on execves
-	  HOST         Host to connect
-	  PORT         Port to listen or connect
-
-
-	>>> rasc2 -h
-	Usage: rax2 [options] [expression]
-	  int   ->  hex           ;  rax2 10
-	  hex   ->  int           ;  rax2 0xa
-	  -int  ->  hex           ;  rax2 -77
-	  -hex  ->  int           ;  rax2 0xffffffb3
-	  int   ->  bin           ;  rax2 b30
-	  bin   ->  int           ;  rax2 1010d
-	  float ->  hex           ;  rax2 3.33f
-	  hex   ->  float         ;  rax2 Fx40551ed8
-	  oct   ->  hex           ;  rax2 35o
-	  hex   ->  oct           ;  rax2 Ox12 (O is a letter)
-	  bin   ->  hex           ;  rax2 1100011b
-	  hex   ->  bin           ;  rax2 Bx63
-	  raw   ->  hex           ;  rax2 -S < /binfile
-	  hex   ->  raw           ;  rax2 -s 414141
-	  -e    swap endianness   ;  rax2 -e 0x33
-	  -f    floating point    ;  rax2 -f 6.3+2.1
-	  -b    binstr -> bin     ;  rax2 -b 01000101 01110110
-	  -s    hexstr -> raw     ;  rax2 -s 43 4a 50
-	  -S    raw -> hexstr     ;  rax2 -S C  J  P
-	  -v    version           ;  rax2 -V
-	  -x    hash string       ;  rax2 -x linux osx
-	  -k    keep base         ;  rax2 -k 33+3 -> 36
-	  -h    help              ;  rax2 -h
-
-
->>> awmtt
-awmtt [ start | stop | restart | -h | -e | -t [ get | change | list | random ] ] [ -C /path/to/rc.lua ] [ -D display ] [ -S windowsize ]
-
-  start			Spawn nested Awesome via Xephyr
-  stop			Stops Xephyr
-	all		Stop all instances of Xephyr 
-  restart		Restart nested Awesome
-  -N|--notest		Don't use a testfile but your actual rc.lua (i.e. /home/fnord0/.config/awesome/rc.lua)
-  -C|--config		Specify configuration file
-  -D|--display		Specify the display to use (e.g. 1)
-  -S|--size		Specify the window size
-  -e|--execute		Execute command in nested Awesome
-  -t|--theme		Control the current theme
-	c|change	Change theme										<<<<<------ TAB = just controlling current theme options
-	p|print		Print themename										<<<<<------  ""                 ""                    ""
-	l|list		List available themes									<<<<<------  ""                 ""                    ""
-	r|random	Choose random theme									<<<<<------  ""                 ""                    ""
-  -h|--help		Show this help text
-  
-examples:
-awmtt start -D 3 -C /etc/xdg/awesome/rc.lua -S 1280x800
-awmtt -t change zenburn
-awmtt start (uses defaults)
-
-The defaults are -D 1 -C /home/fnord0/.config/awesome/rc.lua.test -S 1024x640.
-
-
-
-
-B<USE perltidy + perlcritic> (--brutal --theme=pbp)
-	       /usr/bin/vendor_perl/perlcritic --brutal --theme=pbp hURL-getoptlong
-		tab=4
-
-=head1 DESCRIPTION
-
-=pod
-
-This is a B<paragraph> that uses I<italic> and B<bold> markup using the
-BE<lt>textE<gt> and IE<lt>text<gt> interior sequences. Here is an example
-code fragment: C<substr $text,0,1> and here is a filename: F</usr/bin/perl>.
-All these things are of course represented in a style entirely up to the
-translator. See L<perlpod> for more information.
-
-=cut
-
-=over 4
-
-=item Stay Alert
-
-this is the description of the first stay alert
-
-=item Trust No one
-
-=item Keep yr laser Handy
-
-=back
-
-=for text
-This is a paragraph that will appear in documents produced by the pod2text format.
-
-=for html <font color = red>
-<p>But this will appear in <b>HTML</b> documents
-</font>
-
 =head1 USAGE
 
 I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]> I<[> B<string> I<]>
 
-	COMMAND LINE ARGUMENTS
+  COMMAND LINE ARGUMENTS
 
-	-U|--URL 	=> URL encode				;  ./hURL -U "hello world"
-	-u|--url 	=> uRL decode				;  ./hURL -u "hello%20world"
-	-B|--BASE64 	=> Base64 encode			;  ./hURL -B "hello world"
-	-b|--base64 	=> base64 decode			;  ./hURL -b "aGVsbG8gd29ybGQ="
-	-H|--HTML	=> HTML encode				;  ./hURL -H "<hello world>"
-	-h|--html 	=> hTML decode				;  ./hURL -h "&lt;hello world&gt;"
-	-X|--HEX 	=> ascii ->  heX			;  ./hURL -X "hello world"
-	-x|--hex 	=> hex   ->  ascii			;  ./hURL -x "68656c6c6f20776f726c64"
-	-I|--INT 	=> Int   ->  hex			;  ./hURL -I "10"
-	-i|--int 	=> hex   ->  int			;  ./hURL -i "0xa"
-	-n|--nint 	=> -int  ->  hex			;  ./hURL -n -- -77
-	-N|--NHEX 	=> -hex  ->  iNt			;  ./hURL -N 0xffffffb3
-	-T|--INTB 	=> inT   ->  bin			;  ./hURL -T 30
-	-t|--bint 	=> bin   ->  int			;  ./hURL -t 1010
-	-F|--FLOATH 	=> Float ->  hex			;  ./hURL -F 3.33
-	-l|--hfloat 	=> hex   ->  float			;  ./hURL -l 0x40551ed8
-	-o|--octh 	=> octal ->  hex			;  ./hURL -o 35
-	-O|--HOCT 	=> hex   ->  Octal			;  ./hURL -O 0x12
-	-0|--binh 	=> bin   ->  hex			;  ./hURL -0 1100011
-	-1|--hexb 	=> hex   ->  bin			;  ./hURL -1 0x63
-	-2|--SHA1 	=> SHA1 checksum			;  ./hURL -2 "hello world"
-	-3|--SHA224 	=> SHA224 checksum			;  ./hURL -3 "hello world"
-	-4|--SHA256 	=> SHA256 checksum			;  ./hURL -4 "hello world"
-	-5|--SHA384 	=> SHA384 checksum			;  ./hURL -5 "hello world"
-	-6|--SHA512 	=> SHA512 checksum			;  ./hURL -6 "hello world"
-	-7|--ROT13	=> ROT13 encode				;  ./hURL -7 "hello world"
-	-8|--rot13	=> ROT13 decode				;  ./hURL -8 "uryyb jbeyq"
-	-9|--stack	=> push string 2 stack (corelanc0d3r)	;  ./hURL -9 "hello world"
-	     --esc   :: output in escaped string  {default}		;  "\x68\x00\x01\x02\x03\x04\x05 ..."
-	     --pair  :: output in hexpairs format			;  68000102030405060708090a0b0c0d0e0f ...
-	     --ansiC :: output in C format				;  unsigned char shellcode[] = { 0x68, 0x00, 0x01, 0x02, ... 0x0f, };
-	-m|--md5 	=> md5 digest				;  ./hURL -m "hello world"
-	-e|--net 	=> int -> hex (network-byte order)	;  ./hURL -e 4444
-	-E|--NET 	=> hex (nEtwork-byte order) ->  int	;  ./hURL -E 5c11
-	-s|--suppress			=> suppress (display result only)
-	--color|--nocolor		=> enable/disable colored output [default is ENABLED]
-	--help				=> displays help
-	--man				=> displays extended help
-	--version			=> displays version information
+   -M|--menu	=> Menu-driven GUI		 ;  ./hURL -M
+   -U|--URL	=> URL encode			 ;  ./hURL -U "hello world"
+   -u|--url	=> uRL decode			 ;  ./hURL -u "hello%20world"
+   -D|--DURL	=> Double URL encode		 ;  ./hURL -U "hello world"
+   -d|--durl	=> double URL decode		 ;  ./hURL -u "hello%2520world"
+   -B|--BASE64	=> Base64 encode		 ;  ./hURL -B "hello world"
+   -b|--base64	=> base64 decode		 ;  ./hURL -b "aGVsbG8gd29ybGQ="
+   -H|--HTML	=> HTML encode			 ;  ./hURL -H "<hello world>"
+   -h|--html	=> hTML decode			 ;  ./hURL -h "&lt;hello world&gt;"
+   -X|--HEX	=> ascii ->  heX		 ;  ./hURL -X "hello world"
+   -x|--hex	=> hex   ->  ascii		 ;  ./hURL -x "68656c6c6f20776f72664"
+	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
+	--pair  :: output in hexpair format	    ; 00010203 ...
+   -I|--INT	=> Int   ->  hex		 ;  ./hURL -I "10"
+   -i|--int	=> hex   ->  int		 ;  ./hURL -i "0xa"
+   -n|--nint	=> -int  ->  hex		 ;  ./hURL -n -- -77
+   -N|--NHEX	=> -hex  ->  iNt		 ;  ./hURL -N 0xffffffb3
+   -T|--INTB	=> inT   ->  bin		 ;  ./hURL -T 30
+   -t|--bint	=> bin   ->  int		 ;  ./hURL -t 1010
+   -F|--FLOATH	=> Float ->  hex		 ;  ./hURL -F 3.33
+   -l|--hfloat	=> hex   ->  float		 ;  ./hURL -l 0x40551ed8
+   -o|--octh	=> octal ->  hex		 ;  ./hURL -o 35
+   -O|--HOCT	=> hex   ->  Octal		 ;  ./hURL -O 0x12
+   -0|--binh	=> bin   ->  hex		 ;  ./hURL -0 1100011
+   -1|--hexb	=> hex   ->  bin		 ;  ./hURL -1 0x63
+   -2|--SHA1	=> SHA1 checksum		 ;  ./hURL -2 "hello world"
+   -3|--SHA224	=> SHA224 checksum		 ;  ./hURL -3 "hello world"
+   -4|--SHA256	=> SHA256 checksum		 ;  ./hURL -4 "hello world"
+   -5|--SHA384	=> SHA384 checksum		 ;  ./hURL -5 "hello world"
+   -6|--SHA512	=> SHA512 checksum		 ;  ./hURL -6 "hello world"
+   -7|--ROT13	=> ROT13 encode			 ;  ./hURL -7 "hello world"
+   -8|--rot13	=> ROT13 decode			 ;  ./hURL -8 "uryyb jbeyq"
+   -9|--stack	=> push string 2 stack (corelan) ;  ./hURL -9 "hello world"
+	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
+	--pair  :: output in hexpair format	    ; 00010203 ...
+	--ansiC :: output in C format		    ; 0x00, 0x01, 0x02, 0x03 ...
+   -m|--md5	=> md5 digest			 ;  ./hURL -m "hello world"
+   -e|--net	=> int -> hex (net-byte order)   ;  ./hURL -e 4444
+   -E|--NET	=> hex (nEt-byte order) ->  int  ;  ./hURL -E 5c11
+   -r|--rbin	=> binary [file] -> hex (corelan);  ./hURL -r -f /tmp/msgbox.bin
+   -w|--wbin	=> hex [file] -> binary [file]	 ;  ./hURL -w -f INfile OUTfile
+	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
+	--pair  :: output in hexpair format	    ; 00010203 ...
+	--ansiC :: output in C format		    ; 0x00, 0x01, 0x02, 0x03 ...
 
-	-f|--file <file1>,<file2>	=> use file(s) as input
-	[string]			=> string as input
+   --color|--nocolor	=> enable/disable colored output [default is ENABLED]
+   --corelan		=> display corelan reference
+   --help		=> displays help
+   --man		=> displays extended help with examples
+   --version		=> displays version information
+
+   -s				=> suppress (display result only)
+   -f|--file <file1>,<file2>	=> use file(s) as input
+   [string]			=> string as input
 
 =head1 AUTHOR
 
@@ -1578,24 +3872,39 @@ I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]>
 
 =head1 EXAMPLES
 
-=head2 First Example :: BASE64 decode using suppression option...
+=head2 Example :: BASE64 decode using suppression option...
 
 F<./hURL -b -s "aGVsbG8gd29ybGQ=">
 
-=head2 Second Example :: take file PHP meterpreter as input and convert to hexadecimal...
+=head2 Example :: take file PHP meterpreter as input and convert to hexadecimal...
 
 F<./hURL -X -f /var/www/meterpreter.php>
 
-=head2 Third Example :: Multiple files as input (files are read in as RAW, so binary files can be used as input)
+=head2 Example :: Multiple files as input (files are read in as RAW, so binary files can be used as input)
 
 F<./hURL -Xf <file1E<gt>,<file2E<gt>,<file3E<gt>>
 
-=head2 Forth Example :: Multiple files as input + string on command line {files WILL BE TRANSFORMED BEFORE THE STRING} + multiple flag manipulators
+=head2 Example :: Multiple files as input + string on command line {files WILL BE TRANSFORMED BEFORE THE STRING} + multiple flag manipulators
 
 F<./hURL -23456s -f <file1E<gt>,<file2E<gt> "hello wolrd">
 
-=head2 Fifth Example :: Binary files are read RAW and can be used as input, here we will convert Binary exe file to hexadecimal
+=head2 Example :: Reading in a binary file - outputing in hex {ideal for shellcoding}
 
-F<./hURL -X -f /pentest/windows-binaries/tools/nc.exe>
+F<./hURL -r -f <file1E<gt>>  -> escaped string format "\x00\x01"  
 
+F<./hURL -r --pair -f <file1E<gt>>  -> hexpair format - "0001" 
+
+F<./hURL -r --ansiC -f <file1E<gt>>  -> ansiC format - "0x00, 0x01"
+
+=head2 Example :: Take hex file as input, write to new file as binary {ideal for shellcoding}
+
+F<./hURL -w -f <infileE<gt> <outfileE<gt>>
+
+=head2 Example :: Using hURL's menu-driven GUI (similar to SET/WebSploit)
+
+F<./hURL -M>
+
+=head2 Example :: Disable color output
+
+F<./hURL --nocolor -Xsf /var/www/revshell.php,pythonshell.py>
 

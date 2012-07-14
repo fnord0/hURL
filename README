@@ -1,51 +1,62 @@
 .::[ hURL - hexadecimal & URL (en/de)coder v2.1 ]::.
-o
+
   USAGE:  hURL [ -flag|--flag ] [ -f <file1>,<file2> ] [ string ]
 
-  FLAGS:
-            -U|--URL        => URL encode                           ;  ./hURL -U "hello world"
-            -u|--url        => uRL decode                           ;  ./hURL -u "hello%20world"
-            -B|--BASE64     => Base64 encode                        ;  ./hURL -B "hello world"
-            -b|--base64     => base64 decode                        ;  ./hURL -b "aGVsbG8gd29ybGQ="
-            -H|--HTML       => HTML encode                          ;  ./hURL -H "<hello world>"
-            -h|--html       => hTML decode                          ;  ./hURL -h "&lt;hello world&gt;"
-            -X|--HEX        => ascii ->  heX                        ;  ./hURL -X "hello world"
-            -x|--hex        => hex   ->  ascii                      ;  ./hURL -x "68656c6c6f20776f726c64"
-            -I|--INT        => Int   ->  hex                        ;  ./hURL -I "10"
-            -i|--int        => hex   ->  int                        ;  ./hURL -i "0xa"
-            -n|--nint       => -int  ->  hex                        ;  ./hURL -n -- -77
-            -N|--NHEX       => -hex  ->  iNt                        ;  ./hURL -N 0xffffffb3
-            -T|--INTB       => inT   ->  bin                        ;  ./hURL -T 30
-            -t|--bint       => bin   ->  int                        ;  ./hURL -t 1010
-            -F|--FLOATH     => Float ->  hex                        ;  ./hURL -F 3.33
-            -l|--hfloat     => hex   ->  float                      ;  ./hURL -l 0x40551ed8
-            -o|--octh       => octal ->  hex                        ;  ./hURL -o 35
-            -O|--HOCT       => hex   ->  Octal                      ;  ./hURL -O 0x12
-            -0|--binh       => bin   ->  hex                        ;  ./hURL -0 1100011
-            -1|--hexb       => hex   ->  bin                        ;  ./hURL -1 0x63
-            -2|--SHA1       => SHA1 checksum                        ;  ./hURL -2 "hello world"
-            -3|--SHA224     => SHA224 checksum                      ;  ./hURL -3 "hello world"
-            -4|--SHA256     => SHA256 checksum                      ;  ./hURL -4 "hello world"
-            -5|--SHA384     => SHA384 checksum                      ;  ./hURL -5 "hello world"
-            -6|--SHA512     => SHA512 checksum                      ;  ./hURL -6 "hello world"
-            -7|--ROT13      => ROT13 encode                         ;  ./hURL -7 "hello world"
-            -8|--rot13      => ROT13 decode                         ;  ./hURL -8 "uryyb jbeyq"
-            -9|--stack      => push string 2 stack (corelanc0d3r)   ;  ./hURL -9 "hello world"
-                 --esc  :: output in escaped string {default}       ;  "\x00\x01\x02\x03\x04\x05 ..."
-                 --pair :: output in hexpairs format                ;  000102030405060708090a0b0c0d0e0f ...
-                 --C    :: output in C format                       ;  unsigned char shellcode[] = { 0x00, 0x01, 0x02, ... 0x0b, };
-            -m|--md5        => md5 digest                           ;  ./hURL -m "hello world"
-            -e|--net        => int -> hex (network-byte order)      ;  ./hURL -e 4444
-            -E|--NET        => hex (nEtwork-byte order) ->  int     ;  ./hURL -E 5c11
+   -M|--menu	=> Menu-driven GUI		 ;  ./hURL -M
+   -U|--URL	=> URL encode			 ;  ./hURL -U "hello world"
+   -u|--url	=> uRL decode			 ;  ./hURL -u "hello%20world"
+   -D|--DURL	=> Double URL encode		 ;  ./hURL -U "hello world"
+   -d|--durl	=> double URL decode		 ;  ./hURL -u "hello%2520world"
+   -B|--BASE64	=> Base64 encode		 ;  ./hURL -B "hello world"
+   -b|--base64	=> base64 decode		 ;  ./hURL -b "aGVsbG8gd29ybGQ="
+   -H|--HTML	=> HTML encode			 ;  ./hURL -H "<hello world>"
+   -h|--html	=> hTML decode			 ;  ./hURL -h "&lt;hello world&gt;"
+   -X|--HEX	=> ascii ->  heX		 ;  ./hURL -X "hello world"
+   -x|--hex	=> hex   ->  ascii		 ;  ./hURL -x "68656c6c6f20776f72664"
+	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
+	--pair  :: output in hexpair format	    ; 00010203 ...
+   -I|--INT	=> Int   ->  hex		 ;  ./hURL -I "10"
+   -i|--int	=> hex   ->  int		 ;  ./hURL -i "0xa"
+   -n|--nint	=> -int  ->  hex		 ;  ./hURL -n -- -77
+   -N|--NHEX	=> -hex  ->  iNt		 ;  ./hURL -N 0xffffffb3
+   -T|--INTB	=> inT   ->  bin		 ;  ./hURL -T 30
+   -t|--bint	=> bin   ->  int		 ;  ./hURL -t 1010
+   -F|--FLOATH	=> Float ->  hex		 ;  ./hURL -F 3.33
+   -l|--hfloat	=> hex   ->  float		 ;  ./hURL -l 0x40551ed8
+   -o|--octh	=> octal ->  hex		 ;  ./hURL -o 35
+   -O|--HOCT	=> hex   ->  Octal		 ;  ./hURL -O 0x12
+   -0|--binh	=> bin   ->  hex		 ;  ./hURL -0 1100011
+   -1|--hexb	=> hex   ->  bin		 ;  ./hURL -1 0x63
+   -2|--SHA1	=> SHA1 checksum		 ;  ./hURL -2 "hello world"
+   -3|--SHA224	=> SHA224 checksum		 ;  ./hURL -3 "hello world"
+   -4|--SHA256	=> SHA256 checksum		 ;  ./hURL -4 "hello world"
+   -5|--SHA384	=> SHA384 checksum		 ;  ./hURL -5 "hello world"
+   -6|--SHA512	=> SHA512 checksum		 ;  ./hURL -6 "hello world"
+   -7|--ROT13	=> ROT13 encode			 ;  ./hURL -7 "hello world"
+   -8|--rot13	=> ROT13 decode			 ;  ./hURL -8 "uryyb jbeyq"
+   -9|--stack	=> push string 2 stack (corelan) ;  ./hURL -9 "hello world"
+	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
+	--pair  :: output in hexpair format	    ; 00010203 ...
+	--ansiC :: output in C format		    ; 0x00, 0x01, 0x02, 0x03 ...
+   -m|--md5	=> md5 digest			 ;  ./hURL -m "hello world"
+   -e|--net	=> int -> hex (net-byte order)   ;  ./hURL -e 4444
+   -E|--NET	=> hex (nEt-byte order) ->  int  ;  ./hURL -E 5c11
+   -r|--rbin	=> binary [file] -> hex (corelan);  ./hURL -r -f /tmp/msgbox.bin
+   -w|--wbin	=> hex [file] -> binary [file]	 ;  ./hURL -w -f <INfile> <OUTfile>
+	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
+	--pair  :: output in hexpair format	    ; 00010203 ...
+	--ansiC :: output in C format		    ; 0x00, 0x01, 0x02, 0x03 ...
 
-            -s|--suppress                   => suppress (display result only)
-            --color|--nocolor               => enable/disable colored output [default is ENABLED]
-            --help                          => displays help
-            --man                           => displays extended help
-            --version                       => displays version information
+   --color|--nocolor	=> enable/disable colored output [default is ENABLED]
+   --corelan		=> display corelan reference
+   --help		=> displays help
+   --man		=> displays extended help with examples
+   --version		=> displays version information
 
-            -f|--file <file1>,<file2>       => use (a) file(s) as input
-	    [string]			    => string as input
+   -s				=> suppress (display result only)
+   -f|--file <file1>,<file2>	=> use file(s) as input
+   [string]			=> string as input
+
 
   EXAMPLES:  	./hURL -b -s "aGVsbG8gd29ybGQ="
 	     	./hURL -X -f /var/www/meterpreter.php
