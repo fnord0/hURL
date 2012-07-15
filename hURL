@@ -61,16 +61,16 @@ sub HELP_MESSAGE {
 	print BOLD(), BLUE(), "   -M", CYAN(), "|", BLUE(), "--menu\t", RESET(), "=> ", BOLD(), "M", RESET(), "enu-driven GUI", RESET(), "\t\t ;  $0 -M\n";
 	print BOLD(), BLUE(), "   -U", CYAN(), "|", BLUE(), "--URL\t", RESET(), "=> ", BOLD(), "U", RESET(), "RL encode", RESET(), "\t\t\t ;  $0 -U \"hello world\"\n";
 	print BOLD(), BLUE(), "   -u", CYAN(), "|", BLUE(), "--url\t", RESET(), "=> ", BOLD(), "u", RESET(), "RL decode", RESET(), "\t\t\t ;  $0 -u \"hello%20world\"\n";
-	print BOLD(), BLUE(), "   -D", CYAN(), "|", BLUE(), "--DURL\t", RESET(), "=> ", BOLD(), "D", RESET(), "ouble URL encode", RESET(), "\t\t ;  $0 -U \"hello world\"\n";
-	print BOLD(), BLUE(), "   -d", CYAN(), "|", BLUE(), "--durl\t", RESET(), "=> ", BOLD(), "d", RESET(), "ouble URL decode", RESET(), "\t\t ;  $0 -u \"hello%2520world\"\n";
+	print BOLD(), BLUE(), "   -D", CYAN(), "|", BLUE(), "--DURL\t", RESET(), "=> ", BOLD(), "D", RESET(), "ouble URL encode", RESET(), "\t\t ;  $0 -D \"hello world\"\n";
+	print BOLD(), BLUE(), "   -d", CYAN(), "|", BLUE(), "--durl\t", RESET(), "=> ", BOLD(), "d", RESET(), "ouble URL decode", RESET(), "\t\t ;  $0 -d \"hello%2520world\"\n";
 	print BOLD(), BLUE(), "   -B", CYAN(), "|", BLUE(), "--BASE64\t", RESET(), "=> ", BOLD(), "B", RESET(), "ase64 encode", RESET(), "\t\t ;  $0 -B \"hello world\"\n";
         print BOLD(), BLUE(), "   -b", CYAN(), "|", BLUE(), "--base64\t", RESET(), "=> ", BOLD(), "b", RESET(), "ase64 decode", RESET(), "\t\t ;  $0 -b \"aGVsbG8gd29ybGQ=\"\n";
         print BOLD(), BLUE(), "   -H", CYAN(), "|", BLUE(), "--HTML\t", RESET(), "=> ", BOLD(), "H", RESET(), "TML encode", RESET(), "\t\t\t ;  $0 -H \"<hello world>\"\n";
         print BOLD(), BLUE(), "   -h", CYAN(), "|", BLUE(), "--html\t", RESET(), "=> ", BOLD(), "h", RESET(), "TML decode", RESET(), "\t\t\t ;  $0 -h \"&lt;hello world&gt;\"\n";
         print BOLD(), BLUE(), "   -X", CYAN(), "|", BLUE(), "--HEX\t", RESET(), "=> ascii ->  he", BOLD(), "X", RESET(), "\t\t ;  $0 -X \"hello world\"\n";
-        print BOLD(), BLUE(), "   -x", CYAN(), "|", BLUE(), "--hex\t", RESET(), "=> he", BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t\t ;  $0 -x \"68656c6c6f20776f72664\"\n";
 	print BOLD(), BLUE(), "\t--esc", RESET(), "   :: output in ", BOLD(), "esc", RESET(), "aped string\t    ; \"\\x00\\x01\\x02\\x03 ...\"\n";
 	print BOLD(), BLUE(), "\t--pair", RESET(), "  :: output in hex", BOLD(), "pair", RESET(), " format\t    ; 00010203 ...\n";
+        print BOLD(), BLUE(), "   -x", CYAN(), "|", BLUE(), "--hex\t", RESET(), "=> he", BOLD(), "x", RESET(), "   ->  ascii", RESET(), "\t\t ;  $0 -x \"68656c6c6f20776f726c64\"\n";
         print BOLD(), BLUE(), "   -I", CYAN(), "|", BLUE(), "--INT\t", RESET(), "=> ", BOLD(), "I", RESET(), "nt   ->  hex", RESET(), "\t\t ;  $0 -I \"10\"\n";
         print BOLD(), BLUE(), "   -i", CYAN(), "|", BLUE(), "--int\t", RESET(), "=> hex   ->  ", BOLD(), "i", RESET(), "nt", RESET(), "\t\t ;  $0 -i \"0xa\"\n";
         print BOLD(), BLUE(), "   -n", CYAN(), "|", BLUE(), "--nint\t", RESET(), "=> -i", BOLD(), "n", RESET(), "t  ->  hex", RESET(), "\t\t ;  $0 -n ", BOLD(), "--", RESET(), " -77\n";
@@ -97,9 +97,8 @@ sub HELP_MESSAGE {
         print BOLD(), BLUE(), "   -m", CYAN(), "|", BLUE(), "--md5\t", RESET(), "=> ", BOLD(), "m", RESET(), "d5 digest", RESET(), "\t\t\t ;  $0 -m \"hello world\"\n";
         print BOLD(), BLUE(), "   -e", CYAN(), "|", BLUE(), "--net\t", RESET(), "=> int -> hex (n", BOLD(), "e", RESET(), "t-byte order)", RESET(), "   ;  $0 -e 4444\n";
         print BOLD(), BLUE(), "   -E", CYAN(), "|", BLUE(), "--NET\t", RESET(), "=> hex (n", BOLD(), "E", RESET(), "t-byte order) ->  int", RESET(), "  ;  $0 -E 5c11\n";
-        print BOLD(), BLUE(), "   -r", CYAN(), "|", BLUE(), "--rbin\t", RESET(), "=> binary [", BOLD(), "file", RESET(), "] -> hex (corelan)", RESET(), ";  $0 -r -f /tmp/msgbox.bin\n";
         print BOLD(), BLUE(), "   -w", CYAN(), "|", BLUE(), "--wbin\t", RESET(), "=> hex [", BOLD(), "file", RESET(), "] -> binary [", BOLD(), "file", RESET(), "]", "\t ;  $0 -w -f <", BOLD(), "INfile", RESET(), "> <", BOLD(), "OUTfile", RESET(), ">\n";
-
+        print BOLD(), BLUE(), "   -r", CYAN(), "|", BLUE(), "--rbin\t", RESET(), "=> binary [", BOLD(), "file", RESET(), "] -> hex (corelan)", RESET(), ";  $0 -r -f /tmp/msgbox.bin\n";
 	print BOLD(), BLUE(), "\t--esc", RESET(), "   :: output in ", BOLD(), "esc", RESET(), "aped string\t    ; \"\\x00\\x01\\x02\\x03 ...\"\n";
 	print BOLD(), BLUE(), "\t--pair", RESET(), "  :: output in hex", BOLD(), "pair", RESET(), " format\t    ; 00010203 ...\n";
 	print BOLD(), BLUE(), "\t--ansiC", RESET(), " :: output in ", BOLD(), "C", RESET(), " format\t\t    ; 0x00, 0x01, 0x02, 0x03 ...\n";
@@ -3814,16 +3813,16 @@ I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]>
    -M|--menu	=> Menu-driven GUI		 ;  ./hURL -M
    -U|--URL	=> URL encode			 ;  ./hURL -U "hello world"
    -u|--url	=> uRL decode			 ;  ./hURL -u "hello%20world"
-   -D|--DURL	=> Double URL encode		 ;  ./hURL -U "hello world"
-   -d|--durl	=> double URL decode		 ;  ./hURL -u "hello%2520world"
+   -D|--DURL	=> Double URL encode		 ;  ./hURL -D "hello world"
+   -d|--durl	=> double URL decode		 ;  ./hURL -d "hello%2520world"
    -B|--BASE64	=> Base64 encode		 ;  ./hURL -B "hello world"
    -b|--base64	=> base64 decode		 ;  ./hURL -b "aGVsbG8gd29ybGQ="
    -H|--HTML	=> HTML encode			 ;  ./hURL -H "<hello world>"
    -h|--html	=> hTML decode			 ;  ./hURL -h "&lt;hello world&gt;"
    -X|--HEX	=> ascii ->  heX		 ;  ./hURL -X "hello world"
-   -x|--hex	=> hex   ->  ascii		 ;  ./hURL -x "68656c6c6f20776f72664"
 	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
 	--pair  :: output in hexpair format	    ; 00010203 ...
+   -x|--hex	=> hex   ->  ascii		 ;  ./hURL -x "68656c6c6f20776f726c64"
    -I|--INT	=> Int   ->  hex		 ;  ./hURL -I "10"
    -i|--int	=> hex   ->  int		 ;  ./hURL -i "0xa"
    -n|--nint	=> -int  ->  hex		 ;  ./hURL -n -- -77
@@ -3850,8 +3849,8 @@ I<hURL> I<[> B<->flagF<|>B<-->flag I<]> I<[> B<-f> <B<file1>>F<,><B<file2>> I<]>
    -m|--md5	=> md5 digest			 ;  ./hURL -m "hello world"
    -e|--net	=> int -> hex (net-byte order)   ;  ./hURL -e 4444
    -E|--NET	=> hex (nEt-byte order) ->  int  ;  ./hURL -E 5c11
-   -r|--rbin	=> binary [file] -> hex (corelan);  ./hURL -r -f /tmp/msgbox.bin
    -w|--wbin	=> hex [file] -> binary [file]	 ;  ./hURL -w -f INfile OUTfile
+   -r|--rbin	=> binary [file] -> hex (corelan);  ./hURL -r -f /tmp/msgbox.bin
 	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
 	--pair  :: output in hexpair format	    ; 00010203 ...
 	--ansiC :: output in C format		    ; 0x00, 0x01, 0x02, 0x03 ...

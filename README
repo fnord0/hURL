@@ -5,16 +5,16 @@
    -M|--menu	=> Menu-driven GUI		 ;  ./hURL -M
    -U|--URL	=> URL encode			 ;  ./hURL -U "hello world"
    -u|--url	=> uRL decode			 ;  ./hURL -u "hello%20world"
-   -D|--DURL	=> Double URL encode		 ;  ./hURL -U "hello world"
-   -d|--durl	=> double URL decode		 ;  ./hURL -u "hello%2520world"
+   -D|--DURL	=> Double URL encode		 ;  ./hURL -D "hello world"
+   -d|--durl	=> double URL decode		 ;  ./hURL -d "hello%2520world"
    -B|--BASE64	=> Base64 encode		 ;  ./hURL -B "hello world"
    -b|--base64	=> base64 decode		 ;  ./hURL -b "aGVsbG8gd29ybGQ="
    -H|--HTML	=> HTML encode			 ;  ./hURL -H "<hello world>"
    -h|--html	=> hTML decode			 ;  ./hURL -h "&lt;hello world&gt;"
    -X|--HEX	=> ascii ->  heX		 ;  ./hURL -X "hello world"
-   -x|--hex	=> hex   ->  ascii		 ;  ./hURL -x "68656c6c6f20776f72664"
 	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
 	--pair  :: output in hexpair format	    ; 00010203 ...
+   -x|--hex	=> hex   ->  ascii		 ;  ./hURL -x "68656c6c6f20776f726c64"
    -I|--INT	=> Int   ->  hex		 ;  ./hURL -I "10"
    -i|--int	=> hex   ->  int		 ;  ./hURL -i "0xa"
    -n|--nint	=> -int  ->  hex		 ;  ./hURL -n -- -77
@@ -41,8 +41,8 @@
    -m|--md5	=> md5 digest			 ;  ./hURL -m "hello world"
    -e|--net	=> int -> hex (net-byte order)   ;  ./hURL -e 4444
    -E|--NET	=> hex (nEt-byte order) ->  int  ;  ./hURL -E 5c11
-   -r|--rbin	=> binary [file] -> hex (corelan);  ./hURL -r -f /tmp/msgbox.bin
    -w|--wbin	=> hex [file] -> binary [file]	 ;  ./hURL -w -f <INfile> <OUTfile>
+   -r|--rbin	=> binary [file] -> hex (corelan);  ./hURL -r -f /tmp/msgbox.bin
 	--esc   :: output in escaped string	    ; "\x00\x01\x02\x03 ..."
 	--pair  :: output in hexpair format	    ; 00010203 ...
 	--ansiC :: output in C format		    ; 0x00, 0x01, 0x02, 0x03 ...
