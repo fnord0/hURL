@@ -1197,10 +1197,9 @@ sub str2stk ($) {
                         else
                         {
                           ##add line with spaces + null byte (string terminator)
-			$strOpcodes="  0x68, 0x20, 0x20, 0x20, " . BOLD() . RED() . "0x00" . RESET() . ",    /* PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\' */\n".$strOpcodes;
+			  $strOpcodes="  0x68, 0x20, 0x20, 0x20, " . BOLD() . RED() . "0x00" . RESET() . ",    /* PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\' */\n".$strOpcodes;
                         }
 		print $strOpcodes . BOLD() . "};\n" . RESET();
-
 
                 } elsif (($opts{pair})) {
                         $strHexy = '';
@@ -1220,7 +1219,7 @@ sub str2stk ($) {
                             $strPush = $strHex.$strThisHex;
                             $hexWord=substr($strPush,6,2).substr($strPush,4,2).substr($strPush,2,2).substr($strPush,0,2);
 
-                           $strHex="68".$strHex.$strThisHex.
+                            $strHex="68".$strHex.$strThisHex.
                                     "    # PUSH 0x".substr($strPush,6,2).substr($strPush,4,2).
                                     substr($strPush,2,2).substr($strPush,0,2)."\t". RESET() . chr(39) . BOLD() . hex2ascii($hexWord) . RESET() . chr(39);
 
@@ -1247,7 +1246,7 @@ sub str2stk ($) {
                         else
                         {
                           #add line with spaces + null byte (string terminator)
-                        $strOpcodes="68202020" . BOLD() . RED() . "00 " . RESET() . "   # PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
+                          $strOpcodes="68202020" . BOLD() . RED() . "00 " . RESET() . "   # PUSH 0x" . BOLD() . RED() . "00" . RESET() . "202020"."\t" . RESET() . "\'" . BOLD() . "    " . RESET() . "\'\n".$strOpcodes;
                         }
 		print $strOpcodes;
 
@@ -1361,13 +1360,13 @@ sub str2stksuppress ($) {
                                 $strPush =~ s/0x//g;
                                 $strPush =~ tr/([0-9A-Fa-f]{2})+//cd;
 
-				$strHex="  0x68,".$strHex." 0x00, ";
+				$strHex="  0x68," . $strHex . BOLD() . RED() . " 0x00" . RESET() . ", ";
                                 $strOpcodes=$strHex."\n".$strOpcodes;
                         }
                         else
                         {
                           ##add line with spaces + null byte (string terminator)
-			$strOpcodes="  0x68, 0x20, 0x20, 0x20, 0x00, ".$strOpcodes;
+			  $strOpcodes="  0x68, 0x20, 0x20, 0x20, " . BOLD() . RED() . "0x00" . RESET() . ", \n".$strOpcodes;
                         }
 		print $strOpcodes . BOLD() . "};\n" . RESET();
 
@@ -1402,13 +1401,13 @@ sub str2stksuppress ($) {
                                   $strHex=$strHex."20";
                                 }
                                 $strPush = $strHex;
-                                $strHex="68".$strHex."00";
+                                $strHex="68" . $strHex . BOLD() . RED() . "00" . RESET();
                                 $strOpcodes=$strHex.$strOpcodes;
                         }
                         else
                         {
                           #add line with spaces + null byte (string terminator)
-                        $strOpcodes="6820202000 ".$strOpcodes;
+                          $strOpcodes="68202020" . BOLD() . RED() . "00" . RESET() . $strOpcodes;
                         }
 		print $strOpcodes;
 
@@ -1446,13 +1445,13 @@ sub str2stksuppress ($) {
                   		}
                   		$strPush = $strHex;
                   		$strPush =~ tr/\\x//d;
-		                $strHex="\\x68".$strHex."\\x00";
+		                $strHex="\\x68" . $strHex . BOLD() . RED() . "\\x00" . RESET();
                   		$strOpcodes=$strHex.$strOpcodes;
                		}
                 	else
                 	{
                		        #add line with spaces + null byte (string terminator)
-                 		$strOpcodes="\\x68\\x20\\x20\\x20\\x00".$strOpcodes;
+                 		$strOpcodes="\\x68\\x20\\x20\\x20" . BOLD() . RED() . "\\x00" . RESET() . $strOpcodes;
 			}
 		print $strOpcodes;
 		print chr(34);
